@@ -1,0 +1,10 @@
+{
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+  "cmake.generator": "Ninja",
+  "cmake.configureOnOpen": true,
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "cmake.configureArgs": [
+    "-DCMAKE_PREFIX_PATH=/Users/neuron/Qt/6.10.2/macos"
+  ]
+}

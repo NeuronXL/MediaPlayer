@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake: configure",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S", ".",
+        "-B", "build",
+        "-G", "Ninja",
+        "-DCMAKE_BUILD_TYPE=Debug"
+      ],
+      "problemMatcher": ["$gcc"],
+      "group": "build"
+    },
+    {
+      "label": "CMake: build",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build", "build",
+        "--config", "Debug"
+      ],
+      "problemMatcher": ["$gcc"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOn": "CMake: configure"
+    },
+    {
+      "label": "Run: MediaPlayer",
+      "type": "shell",
+      "command": "${workspaceFolder}/build/MediaPlayer",
+      "problemMatcher": [],
+      "dependsOn": "CMake: build"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+.DS_Store
+
+# CMake / build output
+/build/
+/cmake-build-*/
+
+# Qt Creator local settings
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+/.qtcreator/
+*.user
+
+# Generated binaries and debug symbols
+*.app
+*.dSYM/
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
