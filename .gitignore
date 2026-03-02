@@ -10,6 +10,7 @@
 *.qbs.user
 *.qbs.user.*
 /.qtcreator/
+/.vscode/
 *.user
 
 # Generated binaries and debug symbols
