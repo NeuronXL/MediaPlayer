@@ -12,16 +12,23 @@ DebugWidget::DebugWidget(QWidget* parent)
 
 DebugWidget::~DebugWidget() { delete ui; }
 
-void DebugWidget::setLogs(const QStringList& logs)
+void DebugWidget::setLogs(const DebugLogEntries& logs)
 {
-    ui->logOutput->setPlainText(logs.join('\n'));
+    QStringList formattedLogs;
+    formattedLogs.reserve(logs.size());
+
+    for (const DebugLogEntry& logEntry : logs) {
+        formattedLogs.append(formatDebugLogEntry(logEntry));
+    }
+
+    ui->logOutput->setPlainText(formattedLogs.join('\n'));
 }
 
-void DebugWidget::appendLog(const QString& logMessage)
+void DebugWidget::appendLog(const DebugLogEntry& logEntry)
 {
-    if (logMessage.isEmpty()) {
+    if (logEntry.message.isEmpty()) {
         return;
     }
 
-    ui->logOutput->appendPlainText(logMessage);
+    ui->logOutput->appendPlainText(formatDebugLogEntry(logEntry));
 }

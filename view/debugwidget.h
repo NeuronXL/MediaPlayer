@@ -1,9 +1,9 @@
 #ifndef DEBUGWIDGET_H
 #define DEBUGWIDGET_H
 
-#include <QString>
-#include <QStringList>
 #include <QWidget>
+
+#include "../model/debuglogentry.h"
 
 namespace Ui
 {
@@ -18,10 +18,10 @@ class DebugWidget : public QWidget
     explicit DebugWidget(QWidget* parent = nullptr);
     ~DebugWidget();
 
-    void setLogs(const QStringList& logs);
+    void setLogs(const DebugLogEntries& logs);
 
   public slots:
-    void appendLog(const QString& logMessage);
+    void appendLog(const DebugLogEntry& logEntry);
 
   private:
     Ui::DebugWidget* ui;

@@ -22,12 +22,25 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
 
 qt_add_executable(MediaPlayer
     main.cpp
+    model/debuglogentry.h
     model/debuglogmodel.cpp
-    view/mainwindow.cpp
-    view/mainwindow.ui
+    model/debuglogmodel.h
+    service/ffmpeg/ffmpegframeconverter.cpp
+    service/ffmpeg/ffmpegframeconverter.h
+    service/ffmpeg/ffmpegmediadecoder.cpp
+    service/ffmpeg/ffmpegmediadecoder.h
+    service/ffmpeg/ffmpegutils.cpp
+    service/ffmpeg/ffmpegutils.h
+    service/player/mediaplayerengine.cpp
+    service/player/mediaplayerengine.h
     view/debugwidget.cpp
+    view/debugwidget.h
     view/debugwidget.ui
+    view/mainwindow.cpp
+    view/mainwindow.h
+    view/mainwindow.ui
     viewmodel/mainwindowviewmodel.cpp
+    viewmodel/mainwindowviewmodel.h
 )
 
 target_link_libraries(MediaPlayer PRIVATE

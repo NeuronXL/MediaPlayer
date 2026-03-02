@@ -76,8 +76,10 @@ MainWindow::~MainWindow() { delete ui; }
 
 void MainWindow::openFileDialog()
 {
-    const QString filePath =
-        QFileDialog::getOpenFileName(this, tr("Open Media File"));
+    const QString filePath = QFileDialog::getOpenFileName(
+        this, tr("Open Video File"), QString(),
+        tr("Video Files (*.mp4 *.mkv *.avi *.mov *.wmv *.flv *.webm *.m4v "
+           "*.ts *.mts *.m2ts *.mpeg *.mpg *.3gp *.ogv)"));
 
     if (filePath.isEmpty()) {
         return;

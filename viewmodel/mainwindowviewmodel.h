@@ -3,9 +3,11 @@
 
 #include <QObject>
 #include <QString>
-#include <QStringList>
+
+#include "../model/debuglogentry.h"
 
 class DebugLogModel;
+class MediaPlayerEngine;
 
 class MainWindowViewModel : public QObject
 {
@@ -16,7 +18,7 @@ class MainWindowViewModel : public QObject
     ~MainWindowViewModel() override;
 
     QString selectedFilePath() const;
-    QStringList debugLogs() const;
+    DebugLogEntries debugLogs() const;
 
   public slots:
     void appendDebugLog(const QString& logMessage);
@@ -24,12 +26,13 @@ class MainWindowViewModel : public QObject
     void setSelectedFilePath(const QString& filePath);
 
   signals:
-    void debugLogAdded(const QString& logMessage);
+    void debugLogAdded(const DebugLogEntry& logEntry);
     void openFileRequested();
     void selectedFilePathChanged(const QString& filePath);
 
   private:
     DebugLogModel* m_debugLogModel;
+    MediaPlayerEngine* m_mediaPlayerEngine;
     QString m_selectedFilePath;
 };
 

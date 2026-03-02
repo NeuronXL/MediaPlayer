@@ -2,8 +2,8 @@
 #define DEBUGLOGMODEL_H
 
 #include <QObject>
-#include <QString>
-#include <QStringList>
+
+#include "debuglogentry.h"
 
 class DebugLogModel : public QObject
 {
@@ -13,16 +13,16 @@ class DebugLogModel : public QObject
     explicit DebugLogModel(QObject* parent = nullptr);
     ~DebugLogModel() override;
 
-    QStringList logs() const;
+    DebugLogEntries logs() const;
 
   public slots:
-    void appendLog(const QString& logMessage);
+    void appendLog(const DebugLogEntry& logEntry);
 
   signals:
-    void logAdded(const QString& logMessage);
+    void logAdded(const DebugLogEntry& logEntry);
 
   private:
-    QStringList m_logs;
+    DebugLogEntries m_logs;
 };
 
 #endif // DEBUGLOGMODEL_H

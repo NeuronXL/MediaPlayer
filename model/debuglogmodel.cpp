@@ -7,17 +7,17 @@ DebugLogModel::DebugLogModel(QObject* parent)
 
 DebugLogModel::~DebugLogModel() = default;
 
-QStringList DebugLogModel::logs() const
+DebugLogEntries DebugLogModel::logs() const
 {
     return m_logs;
 }
 
-void DebugLogModel::appendLog(const QString& logMessage)
+void DebugLogModel::appendLog(const DebugLogEntry& logEntry)
 {
-    if (logMessage.isEmpty()) {
+    if (logEntry.message.isEmpty()) {
         return;
     }
 
-    m_logs.append(logMessage);
-    emit logAdded(logMessage);
+    m_logs.append(logEntry);
+    emit logAdded(logEntry);
 }
