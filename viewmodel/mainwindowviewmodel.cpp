@@ -16,6 +16,8 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
             [this](const QString& filePath) {
                 appendDebugLog(tr("Opening media file: %1").arg(filePath));
             });
+    connect(m_mediaPlayerEngine, &MediaPlayerEngine::debugMessageGenerated, this,
+            &MainWindowViewModel::appendDebugLog);
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaOpened, this,
             [this](const QString& filePath) {
                 if (m_selectedFilePath != filePath) {
@@ -40,6 +42,8 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
                 m_selectedFilePath = filePath;
                 emit selectedFilePathChanged(m_selectedFilePath);
             });
+    connect(m_mediaPlayerEngine, &MediaPlayerEngine::firstFrameReady, this,
+            &MainWindowViewModel::previewFrameChanged);
 }
 
 MainWindowViewModel::~MainWindowViewModel() = default;

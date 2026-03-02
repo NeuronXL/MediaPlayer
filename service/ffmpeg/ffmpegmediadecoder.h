@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QString>
 
+struct AVFrame;
+
 class FFmpegMediaDecoder : public QObject
 {
     Q_OBJECT
@@ -20,10 +22,12 @@ class FFmpegMediaDecoder : public QObject
     void closeMedia();
 
   signals:
+    void decoderLogGenerated(const QString& message);
     void mediaOpenStarted(const QString& filePath);
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
     void currentMediaPathChanged(const QString& filePath);
+    void firstFrameDecoded(AVFrame* frame);
 
   private:
     bool isSupportedVideoFile(const QString& filePath) const;

@@ -6,6 +6,7 @@
 class DebugWidget;
 class MainWindowViewModel;
 class QPropertyAnimation;
+class VideoWidget;
 
 namespace Ui
 {
@@ -31,6 +32,7 @@ class MainWindow : public QMainWindow
     Ui::MainWindow* ui;
     DebugWidget* m_debugWidget;
     QPropertyAnimation* m_debugPanelAnimation;
+    VideoWidget* m_videoWidget;
     MainWindowViewModel* m_viewModel;
     int m_debugPanelExpandedHeight;
     int m_windowBaseHeight;

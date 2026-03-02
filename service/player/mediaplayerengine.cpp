@@ -1,11 +1,17 @@
 #include "mediaplayerengine.h"
 
+extern "C" {
+#include <libavutil/frame.h>
+}
+
 #include "../ffmpeg/ffmpegmediadecoder.h"
 
 MediaPlayerEngine::MediaPlayerEngine(QObject* parent)
     : QObject(parent)
     , m_mediaDecoder(new FFmpegMediaDecoder(this))
 {
+    connect(m_mediaDecoder, &FFmpegMediaDecoder::decoderLogGenerated, this,
+            &MediaPlayerEngine::debugMessageGenerated);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaOpenStarted, this,
             &MediaPlayerEngine::mediaOpenStarted);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaOpened, this,
@@ -14,6 +20,21 @@ MediaPlayerEngine::MediaPlayerEngine(QObject* parent)
             &MediaPlayerEngine::mediaOpenFailed);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::currentMediaPathChanged, this,
             &MediaPlayerEngine::currentMediaPathChanged);
+    connect(m_mediaDecoder, &FFmpegMediaDecoder::firstFrameDecoded, this,
+            [this](AVFrame* frame) {
+                const QImage image = m_frameConverter.toQImage(frame);
+                emit debugMessageGenerated(
+                    tr("Converted QImage: isNull=%1 size=%2x%3")
+                        .arg(image.isNull() ? QStringLiteral("true")
+                                            : QStringLiteral("false"))
+                        .arg(image.width())
+                        .arg(image.height()));
+                av_frame_free(&frame);
+
+                if (!image.isNull()) {
+                    emit firstFrameReady(image);
+                }
+            });
 }
 
 MediaPlayerEngine::~MediaPlayerEngine() = default;

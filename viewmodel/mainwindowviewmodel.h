@@ -1,6 +1,7 @@
 #ifndef MAINWINDOWVIEWMODEL_H
 #define MAINWINDOWVIEWMODEL_H
 
+#include <QImage>
 #include <QObject>
 #include <QString>
 
@@ -28,6 +29,7 @@ class MainWindowViewModel : public QObject
   signals:
     void debugLogAdded(const DebugLogEntry& logEntry);
     void openFileRequested();
+    void previewFrameChanged(const QImage& frame);
     void selectedFilePathChanged(const QString& filePath);
 
   private:

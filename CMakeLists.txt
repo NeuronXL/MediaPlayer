@@ -39,6 +39,9 @@ qt_add_executable(MediaPlayer
     view/mainwindow.cpp
     view/mainwindow.h
     view/mainwindow.ui
+    view/videowidget.cpp
+    view/videowidget.h
+    view/videowidget.ui
     viewmodel/mainwindowviewmodel.cpp
     viewmodel/mainwindowviewmodel.h
 )
