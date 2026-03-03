@@ -1,83 +1,120 @@
 #include "mediaplayerengine.h"
 
-extern "C" {
-#include <libavutil/frame.h>
-}
-
-#include "../ffmpeg/ffmpegmediadecoder.h"
+#include "../ffmpeg/ffmpegdecoderworker.h"
 #include "../logging/logservice.h"
 
 MediaPlayerEngine::MediaPlayerEngine(LogService* logService, QObject* parent)
     : QObject(parent)
     , m_logService(logService)
-    , m_mediaDecoder(new FFmpegMediaDecoder(logService, this))
+    , m_decoderThread(new QThread(this))
+    , m_decoderWorker(new FFmpegDecoderWorker(logService))
+    , m_hasOpenedMedia(false)
 {
-    connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaOpenStarted, this,
-            &MediaPlayerEngine::mediaOpenStarted);
-    connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaOpened, this,
-            &MediaPlayerEngine::mediaOpened);
-    connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaOpenFailed, this,
-            &MediaPlayerEngine::mediaOpenFailed);
-    connect(m_mediaDecoder, &FFmpegMediaDecoder::currentMediaPathChanged, this,
-            &MediaPlayerEngine::currentMediaPathChanged);
-    connect(m_mediaDecoder, &FFmpegMediaDecoder::firstFrameDecoded, this,
-            [this](AVFrame* frame) {
-                const QImage image = m_frameConverter.toQImage(frame);
-                if (m_logService != nullptr) {
-                    m_logService->append(
-                        tr("Converted QImage: isNull=%1 size=%2x%3")
-                            .arg(image.isNull() ? QStringLiteral("true")
-                                                : QStringLiteral("false"))
-                            .arg(image.width())
-                            .arg(image.height()));
-                }
-                av_frame_free(&frame);
-
-                if (!image.isNull()) {
-                    emit firstFrameReady(image);
-                }
-            });
+    setupWorker();
 }
 
-MediaPlayerEngine::~MediaPlayerEngine() = default;
+MediaPlayerEngine::~MediaPlayerEngine()
+{
+    m_decoderThread->quit();
+    m_decoderThread->wait();
+}
+
+void MediaPlayerEngine::setupWorker()
+{
+    m_decoderWorker->moveToThread(m_decoderThread);
+    connect(m_decoderThread, &QThread::finished, m_decoderWorker,
+            &QObject::deleteLater);
+
+    connect(this, &MediaPlayerEngine::openMediaRequested, m_decoderWorker,
+            &FFmpegDecoderWorker::openMedia, Qt::QueuedConnection);
+    connect(this, &MediaPlayerEngine::closeMediaRequested, m_decoderWorker,
+            &FFmpegDecoderWorker::closeMedia, Qt::QueuedConnection);
+    connect(this, &MediaPlayerEngine::playRequested, m_decoderWorker,
+            &FFmpegDecoderWorker::play, Qt::QueuedConnection);
+    connect(this, &MediaPlayerEngine::pauseRequested, m_decoderWorker,
+            &FFmpegDecoderWorker::pause, Qt::QueuedConnection);
+    connect(this, &MediaPlayerEngine::stopRequested, m_decoderWorker,
+            &FFmpegDecoderWorker::stop, Qt::QueuedConnection);
+    connect(this, &MediaPlayerEngine::seekRequested, m_decoderWorker,
+            &FFmpegDecoderWorker::seek, Qt::QueuedConnection);
+
+    connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenStarted, this,
+            &MediaPlayerEngine::mediaOpenStarted, Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpened, this,
+            &MediaPlayerEngine::handleMediaOpened,
+            Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenFailed, this,
+            &MediaPlayerEngine::handleMediaOpenFailed,
+            Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::currentMediaPathChanged, this,
+            &MediaPlayerEngine::handleCurrentMediaPathChanged,
+            Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::firstFrameReady, this,
+            &MediaPlayerEngine::firstFrameReady, Qt::QueuedConnection);
+
+    m_decoderThread->start();
+}
 
 QString MediaPlayerEngine::currentMediaPath() const
 {
-    return m_mediaDecoder->currentMediaPath();
+    return m_currentMediaPath;
 }
 
 bool MediaPlayerEngine::hasOpenedMedia() const
 {
-    return m_mediaDecoder->hasOpenedMedia();
+    return m_hasOpenedMedia;
 }
 
 void MediaPlayerEngine::openMedia(const QString& filePath)
 {
-    m_mediaDecoder->openMedia(filePath);
+    emit openMediaRequested(filePath);
 }
 
 void MediaPlayerEngine::closeMedia()
 {
-    m_mediaDecoder->closeMedia();
+    emit closeMediaRequested();
 }
 
 void MediaPlayerEngine::play()
 {
-    // TODO: Implement playback loop on top of the decoder.
+    emit playRequested();
 }
 
 void MediaPlayerEngine::pause()
 {
-    // TODO: Implement pause state handling.
+    emit pauseRequested();
 }
 
 void MediaPlayerEngine::stop()
 {
-    // TODO: Implement stop and playback reset behavior.
+    emit stopRequested();
 }
 
 void MediaPlayerEngine::seek(qint64 positionMs)
 {
-    Q_UNUSED(positionMs);
-    // TODO: Implement seeking once decode pipeline is in place.
+    emit seekRequested(positionMs);
+}
+
+void MediaPlayerEngine::handleMediaOpened(const QString& filePath)
+{
+    m_hasOpenedMedia = true;
+    m_currentMediaPath = filePath;
+    emit mediaOpened(filePath);
+}
+
+void MediaPlayerEngine::handleMediaOpenFailed(const QString& filePath,
+                                              const QString& reason)
+{
+    m_hasOpenedMedia = false;
+    emit mediaOpenFailed(filePath, reason);
+}
+
+void MediaPlayerEngine::handleCurrentMediaPathChanged(const QString& filePath)
+{
+    m_currentMediaPath = filePath;
+    if (filePath.isEmpty()) {
+        m_hasOpenedMedia = false;
+    }
+
+    emit currentMediaPathChanged(filePath);
 }

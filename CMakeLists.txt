@@ -27,6 +27,8 @@ qt_add_executable(MediaPlayer
     model/logmodel.h
     service/ffmpeg/ffmpegframeconverter.cpp
     service/ffmpeg/ffmpegframeconverter.h
+    service/ffmpeg/ffmpegdecoderworker.cpp
+    service/ffmpeg/ffmpegdecoderworker.h
     service/ffmpeg/ffmpegmediadecoder.cpp
     service/ffmpeg/ffmpegmediadecoder.h
     service/ffmpeg/ffmpegutils.cpp
