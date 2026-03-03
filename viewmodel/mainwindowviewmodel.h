@@ -5,9 +5,8 @@
 #include <QObject>
 #include <QString>
 
-#include "../model/debuglogentry.h"
-
-class DebugLogModel;
+class LogModel;
+class LogService;
 class MediaPlayerEngine;
 
 class MainWindowViewModel : public QObject
@@ -18,22 +17,21 @@ class MainWindowViewModel : public QObject
     explicit MainWindowViewModel(QObject* parent = nullptr);
     ~MainWindowViewModel() override;
 
+    LogModel* logModel() const;
     QString selectedFilePath() const;
-    DebugLogEntries debugLogs() const;
 
   public slots:
-    void appendDebugLog(const QString& logMessage);
+    void appendLog(const QString& logMessage);
     void requestOpenFile();
     void setSelectedFilePath(const QString& filePath);
 
   signals:
-    void debugLogAdded(const DebugLogEntry& logEntry);
     void openFileRequested();
     void previewFrameChanged(const QImage& frame);
     void selectedFilePathChanged(const QString& filePath);
 
   private:
-    DebugLogModel* m_debugLogModel;
+    LogService* m_logService;
     MediaPlayerEngine* m_mediaPlayerEngine;
     QString m_selectedFilePath;
 };

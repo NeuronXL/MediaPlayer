@@ -9,13 +9,14 @@
 
 struct AVFrame;
 class FFmpegMediaDecoder;
+class LogService;
 
 class MediaPlayerEngine : public QObject
 {
     Q_OBJECT
 
   public:
-    explicit MediaPlayerEngine(QObject* parent = nullptr);
+    explicit MediaPlayerEngine(LogService* logService, QObject* parent = nullptr);
     ~MediaPlayerEngine() override;
 
     QString currentMediaPath() const;
@@ -30,7 +31,6 @@ class MediaPlayerEngine : public QObject
     void seek(qint64 positionMs);
 
   signals:
-    void debugMessageGenerated(const QString& message);
     void mediaOpenStarted(const QString& filePath);
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
@@ -39,6 +39,7 @@ class MediaPlayerEngine : public QObject
 
   private:
     FFmpegFrameConverter m_frameConverter;
+    LogService* m_logService;
     FFmpegMediaDecoder* m_mediaDecoder;
 };
 

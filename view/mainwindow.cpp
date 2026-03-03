@@ -4,7 +4,7 @@
 #include <QPropertyAnimation>
 #include <QVBoxLayout>
 
-#include "debugwidget.h"
+#include "logwidget.h"
 #include "videowidget.h"
 #include "ui_mainwindow.h"
 #include "../viewmodel/mainwindowviewmodel.h"
@@ -12,7 +12,7 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_debugWidget(nullptr)
+    , m_logWidget(nullptr)
     , m_debugPanelAnimation(nullptr)
     , m_videoWidget(nullptr)
     , m_viewModel(new MainWindowViewModel(this))
@@ -35,11 +35,11 @@ MainWindow::MainWindow(QWidget* parent)
     debugLayout->setContentsMargins(0, 0, 0, 0);
     debugLayout->setSpacing(0);
 
-    m_debugWidget = new DebugWidget(ui->debugPanelContainer);
-    debugLayout->addWidget(m_debugWidget);
-    m_debugWidget->setLogs(m_viewModel->debugLogs());
+    m_logWidget = new LogWidget(ui->debugPanelContainer);
+    debugLayout->addWidget(m_logWidget);
+    m_logWidget->setLogModel(m_viewModel->logModel());
 
-    m_debugPanelExpandedHeight = qMax(180, m_debugWidget->sizeHint().height());
+    m_debugPanelExpandedHeight = qMax(180, m_logWidget->sizeHint().height());
 
     m_debugPanelAnimation =
         new QPropertyAnimation(ui->debugPanelContainer, "maximumHeight", this);
@@ -75,8 +75,6 @@ MainWindow::MainWindow(QWidget* parent)
             &MainWindow::toggleDebugPanel);
     connect(m_viewModel, &MainWindowViewModel::openFileRequested, this,
             &MainWindow::openFileDialog);
-    connect(m_viewModel, &MainWindowViewModel::debugLogAdded, m_debugWidget,
-            &DebugWidget::appendLog);
     connect(m_viewModel, &MainWindowViewModel::previewFrameChanged,
             m_videoWidget, &VideoWidget::setFrame);
     connect(m_viewModel, &MainWindowViewModel::selectedFilePathChanged, this,
@@ -123,6 +121,6 @@ void MainWindow::animateDebugPanel(bool expand)
 
 void MainWindow::updateSelectedFilePath(const QString& filePath)
 {
-    m_viewModel->appendDebugLog(tr("Selected file: %1").arg(filePath));
+    m_viewModel->appendLog(tr("Selected file: %1").arg(filePath));
     Q_UNUSED(filePath);
 }

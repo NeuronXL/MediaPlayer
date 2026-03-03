@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>DebugWidget</class>
- <widget class="QWidget" name="DebugWidget">
+ <class>LogWidget</class>
+ <widget class="QWidget" name="LogWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -32,7 +32,7 @@
       <bool>true</bool>
      </property>
      <property name="placeholderText">
-      <string>Debug logs will appear here.</string>
+      <string>Logs will appear here.</string>
      </property>
     </widget>
    </item>

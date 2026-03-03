@@ -5,13 +5,13 @@ extern "C" {
 }
 
 #include "../ffmpeg/ffmpegmediadecoder.h"
+#include "../logging/logservice.h"
 
-MediaPlayerEngine::MediaPlayerEngine(QObject* parent)
+MediaPlayerEngine::MediaPlayerEngine(LogService* logService, QObject* parent)
     : QObject(parent)
-    , m_mediaDecoder(new FFmpegMediaDecoder(this))
+    , m_logService(logService)
+    , m_mediaDecoder(new FFmpegMediaDecoder(logService, this))
 {
-    connect(m_mediaDecoder, &FFmpegMediaDecoder::decoderLogGenerated, this,
-            &MediaPlayerEngine::debugMessageGenerated);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaOpenStarted, this,
             &MediaPlayerEngine::mediaOpenStarted);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaOpened, this,
@@ -23,12 +23,14 @@ MediaPlayerEngine::MediaPlayerEngine(QObject* parent)
     connect(m_mediaDecoder, &FFmpegMediaDecoder::firstFrameDecoded, this,
             [this](AVFrame* frame) {
                 const QImage image = m_frameConverter.toQImage(frame);
-                emit debugMessageGenerated(
-                    tr("Converted QImage: isNull=%1 size=%2x%3")
-                        .arg(image.isNull() ? QStringLiteral("true")
-                                            : QStringLiteral("false"))
-                        .arg(image.width())
-                        .arg(image.height()));
+                if (m_logService != nullptr) {
+                    m_logService->append(
+                        tr("Converted QImage: isNull=%1 size=%2x%3")
+                            .arg(image.isNull() ? QStringLiteral("true")
+                                                : QStringLiteral("false"))
+                            .arg(image.width())
+                            .arg(image.height()));
+                }
                 av_frame_free(&frame);
 
                 if (!image.isNull()) {

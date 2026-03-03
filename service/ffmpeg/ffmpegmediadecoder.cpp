@@ -2,6 +2,8 @@
 
 #include <QFileInfo>
 
+#include "../logging/logservice.h"
+
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -9,8 +11,9 @@ extern "C" {
 #include <libavutil/imgutils.h>
 }
 
-FFmpegMediaDecoder::FFmpegMediaDecoder(QObject* parent)
+FFmpegMediaDecoder::FFmpegMediaDecoder(LogService* logService, QObject* parent)
     : QObject(parent)
+    , m_logService(logService)
 {
 }
 
@@ -189,12 +192,14 @@ void FFmpegMediaDecoder::openMedia(const QString& filePath)
                 return;
             }
 
-            emit decoderLogGenerated(
-                tr("First decoded frame: width=%1 height=%2 format=%3 pts=%4")
-                    .arg(decodedFrame->width)
-                    .arg(decodedFrame->height)
-                    .arg(decodedFrame->format)
-                    .arg(decodedFrame->pts));
+            if (m_logService != nullptr) {
+                m_logService->append(
+                    tr("First decoded frame: width=%1 height=%2 format=%3 pts=%4")
+                        .arg(decodedFrame->width)
+                        .arg(decodedFrame->height)
+                        .arg(decodedFrame->format)
+                        .arg(decodedFrame->pts));
+            }
 
             hasDecodedFirstFrame = true;
             emit firstFrameDecoded(decodedFrame);

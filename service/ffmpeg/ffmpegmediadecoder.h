@@ -5,13 +5,14 @@
 #include <QString>
 
 struct AVFrame;
+class LogService;
 
 class FFmpegMediaDecoder : public QObject
 {
     Q_OBJECT
 
   public:
-    explicit FFmpegMediaDecoder(QObject* parent = nullptr);
+    explicit FFmpegMediaDecoder(LogService* logService, QObject* parent = nullptr);
     ~FFmpegMediaDecoder() override;
 
     QString currentMediaPath() const;
@@ -22,7 +23,6 @@ class FFmpegMediaDecoder : public QObject
     void closeMedia();
 
   signals:
-    void decoderLogGenerated(const QString& message);
     void mediaOpenStarted(const QString& filePath);
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
@@ -32,6 +32,7 @@ class FFmpegMediaDecoder : public QObject
   private:
     bool isSupportedVideoFile(const QString& filePath) const;
 
+    LogService* m_logService;
     QString m_currentMediaPath;
 };
 

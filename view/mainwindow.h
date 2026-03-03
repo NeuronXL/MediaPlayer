@@ -3,7 +3,7 @@
 
 #include <QMainWindow>
 
-class DebugWidget;
+class LogWidget;
 class MainWindowViewModel;
 class QPropertyAnimation;
 class VideoWidget;
@@ -30,7 +30,7 @@ class MainWindow : public QMainWindow
     void animateDebugPanel(bool expand);
 
     Ui::MainWindow* ui;
-    DebugWidget* m_debugWidget;
+    LogWidget* m_logWidget;
     QPropertyAnimation* m_debugPanelAnimation;
     VideoWidget* m_videoWidget;
     MainWindowViewModel* m_viewModel;
