@@ -11,7 +11,6 @@ MediaPlayerEngine::MediaPlayerEngine(LogService* logService, QObject* parent)
     , m_hasOpenedMedia(false)
     , m_playbackState(PlaybackState::Idle)
 {
-    qRegisterMetaType<PlaybackState>("PlaybackState");
     setupWorker();
 }
 

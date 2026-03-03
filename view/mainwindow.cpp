@@ -5,6 +5,7 @@
 #include <QVBoxLayout>
 
 #include "logwidget.h"
+#include "playbackcontrolwidget.h"
 #include "videowidget.h"
 #include "ui_mainwindow.h"
 #include "../viewmodel/mainwindowviewmodel.h"
@@ -14,6 +15,7 @@ MainWindow::MainWindow(QWidget* parent)
     , ui(new Ui::MainWindow)
     , m_logWidget(nullptr)
     , m_debugPanelAnimation(nullptr)
+    , m_playbackControlWidget(nullptr)
     , m_videoWidget(nullptr)
     , m_viewModel(new MainWindowViewModel(this))
     , m_debugPanelExpandedHeight(240)
@@ -28,8 +30,18 @@ MainWindow::MainWindow(QWidget* parent)
     contentLayout->setContentsMargins(0, 0, 0, 0);
     contentLayout->setSpacing(0);
 
-    m_videoWidget = new VideoWidget(ui->contentWidget);
-    contentLayout->addWidget(m_videoWidget);
+    auto* videoPanelWidget = new QWidget(ui->contentWidget);
+    videoPanelWidget->setObjectName("videoPanelWidget");
+    auto* videoPanelLayout = new QVBoxLayout(videoPanelWidget);
+    videoPanelLayout->setContentsMargins(0, 0, 0, 0);
+    videoPanelLayout->setSpacing(0);
+
+    m_videoWidget = new VideoWidget(videoPanelWidget);
+    m_playbackControlWidget = new PlaybackControlWidget(videoPanelWidget);
+
+    videoPanelLayout->addWidget(m_videoWidget, 1);
+    videoPanelLayout->addWidget(m_playbackControlWidget, 0);
+    contentLayout->addWidget(videoPanelWidget);
 
     auto* debugLayout = new QVBoxLayout(ui->debugPanelContainer);
     debugLayout->setContentsMargins(0, 0, 0, 0);
@@ -63,15 +75,17 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_viewModel, &MainWindowViewModel::previewFrameChanged,
             m_videoWidget, &VideoWidget::setFrame);
     connect(m_viewModel, &MainWindowViewModel::playbackStateChanged,
-            m_videoWidget, &VideoWidget::setPlaybackState);
+            m_playbackControlWidget, &PlaybackControlWidget::setPlaybackState);
     connect(m_viewModel, &MainWindowViewModel::selectedFilePathChanged, this,
             &MainWindow::updateSelectedFilePath);
-    connect(m_videoWidget, &VideoWidget::playRequested, m_viewModel,
+    connect(m_playbackControlWidget, &PlaybackControlWidget::playRequested,
+            m_viewModel,
             &MainWindowViewModel::playPlayback);
-    connect(m_videoWidget, &VideoWidget::pauseRequested, m_viewModel,
+    connect(m_playbackControlWidget, &PlaybackControlWidget::pauseRequested,
+            m_viewModel,
             &MainWindowViewModel::pausePlayback);
 
-    m_videoWidget->setPlaybackState(m_viewModel->playbackState());
+    m_playbackControlWidget->setPlaybackState(m_viewModel->playbackState());
 }
 
 MainWindow::~MainWindow() { delete ui; }

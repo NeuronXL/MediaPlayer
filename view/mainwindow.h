@@ -5,6 +5,7 @@
 
 class LogWidget;
 class MainWindowViewModel;
+class PlaybackControlWidget;
 class QPropertyAnimation;
 class VideoWidget;
 
@@ -34,6 +35,7 @@ class MainWindow : public QMainWindow
     Ui::MainWindow* ui;
     LogWidget* m_logWidget;
     QPropertyAnimation* m_debugPanelAnimation;
+    PlaybackControlWidget* m_playbackControlWidget;
     VideoWidget* m_videoWidget;
     MainWindowViewModel* m_viewModel;
     int m_debugPanelExpandedHeight;
