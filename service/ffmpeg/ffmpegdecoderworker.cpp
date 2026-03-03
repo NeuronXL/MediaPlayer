@@ -22,25 +22,7 @@ FFmpegDecoderWorker::FFmpegDecoderWorker(LogService* logService, QObject* parent
     connect(m_mediaDecoder, &FFmpegMediaDecoder::currentMediaPathChanged, this,
             &FFmpegDecoderWorker::currentMediaPathChanged);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::firstFrameDecoded, this,
-            [this](AVFrame* frame) {
-                FFmpegFrameConverter frameConverter;
-                const QImage image = frameConverter.toQImage(frame);
-
-                if (m_logService != nullptr) {
-                    m_logService->append(
-                        tr("Converted QImage: isNull=%1 size=%2x%3")
-                            .arg(image.isNull() ? QStringLiteral("true")
-                                                : QStringLiteral("false"))
-                            .arg(image.width())
-                            .arg(image.height()));
-                }
-
-                av_frame_free(&frame);
-
-                if (!image.isNull()) {
-                    emit firstFrameReady(image);
-                }
-            });
+            &FFmpegDecoderWorker::handleFirstFrameDecoded);
 }
 
 FFmpegDecoderWorker::~FFmpegDecoderWorker() = default;
@@ -74,4 +56,25 @@ void FFmpegDecoderWorker::seek(qint64 positionMs)
 {
     Q_UNUSED(positionMs);
     // TODO: Implement seeking in the decode worker.
+}
+
+void FFmpegDecoderWorker::handleFirstFrameDecoded(AVFrame* frame)
+{
+    FFmpegFrameConverter frameConverter;
+    const QImage image = frameConverter.toQImage(frame);
+
+    if (m_logService != nullptr) {
+        m_logService->append(
+            tr("Converted QImage: isNull=%1 size=%2x%3")
+                .arg(image.isNull() ? QStringLiteral("true")
+                                    : QStringLiteral("false"))
+                .arg(image.width())
+                .arg(image.height()));
+    }
+
+    av_frame_free(&frame);
+
+    if (!image.isNull()) {
+        emit firstFrameReady(image);
+    }
 }

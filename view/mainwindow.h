@@ -22,6 +22,8 @@ class MainWindow : public QMainWindow
     ~MainWindow();
 
   private slots:
+    void handleDebugPanelAnimationFinished();
+    void handleDebugPanelAnimationValueChanged(const QVariant& value);
     void openFileDialog();
     void toggleDebugPanel();
     void updateSelectedFilePath(const QString& filePath);

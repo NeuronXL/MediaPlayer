@@ -47,25 +47,10 @@ MainWindow::MainWindow(QWidget* parent)
     m_debugPanelAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
     connect(m_debugPanelAnimation, &QPropertyAnimation::valueChanged, this,
-            [this](const QVariant& value) {
-                const int panelHeight = value.toInt();
-                ui->debugPanelContainer->setMinimumHeight(panelHeight);
+            &MainWindow::handleDebugPanelAnimationValueChanged);
 
-                if (!isFullScreen()) {
-                    resize(width(), m_windowBaseHeight + panelHeight);
-                }
-            });
-
-    connect(m_debugPanelAnimation, &QPropertyAnimation::finished, this, [this] {
-        if (ui->debugPanelContainer->maximumHeight() == 0) {
-            ui->debugPanelContainer->hide();
-        } else {
-            ui->debugPanelContainer->setMinimumHeight(
-                m_debugPanelExpandedHeight);
-            ui->debugPanelContainer->setMaximumHeight(
-                m_debugPanelExpandedHeight);
-        }
-    });
+    connect(m_debugPanelAnimation, &QPropertyAnimation::finished, this,
+            &MainWindow::handleDebugPanelAnimationFinished);
 
     ui->actionDebug->setCheckable(true);
 
@@ -77,8 +62,16 @@ MainWindow::MainWindow(QWidget* parent)
             &MainWindow::openFileDialog);
     connect(m_viewModel, &MainWindowViewModel::previewFrameChanged,
             m_videoWidget, &VideoWidget::setFrame);
+    connect(m_viewModel, &MainWindowViewModel::playbackStateChanged,
+            m_videoWidget, &VideoWidget::setPlaybackState);
     connect(m_viewModel, &MainWindowViewModel::selectedFilePathChanged, this,
             &MainWindow::updateSelectedFilePath);
+    connect(m_videoWidget, &VideoWidget::playRequested, m_viewModel,
+            &MainWindowViewModel::playPlayback);
+    connect(m_videoWidget, &VideoWidget::pauseRequested, m_viewModel,
+            &MainWindowViewModel::pausePlayback);
+
+    m_videoWidget->setPlaybackState(m_viewModel->playbackState());
 }
 
 MainWindow::~MainWindow() { delete ui; }
@@ -95,6 +88,27 @@ void MainWindow::openFileDialog()
     }
 
     m_viewModel->setSelectedFilePath(filePath);
+}
+
+void MainWindow::handleDebugPanelAnimationFinished()
+{
+    if (ui->debugPanelContainer->maximumHeight() == 0) {
+        ui->debugPanelContainer->hide();
+        return;
+    }
+
+    ui->debugPanelContainer->setMinimumHeight(m_debugPanelExpandedHeight);
+    ui->debugPanelContainer->setMaximumHeight(m_debugPanelExpandedHeight);
+}
+
+void MainWindow::handleDebugPanelAnimationValueChanged(const QVariant& value)
+{
+    const int panelHeight = value.toInt();
+    ui->debugPanelContainer->setMinimumHeight(panelHeight);
+
+    if (!isFullScreen()) {
+        resize(width(), m_windowBaseHeight + panelHeight);
+    }
 }
 
 void MainWindow::toggleDebugPanel()

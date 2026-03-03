@@ -5,6 +5,8 @@
 #include <QImage>
 #include <QString>
 
+struct AVFrame;
+
 class FFmpegMediaDecoder;
 class LogService;
 
@@ -23,6 +25,9 @@ class FFmpegDecoderWorker : public QObject
     void pause();
     void stop();
     void seek(qint64 positionMs);
+
+  private slots:
+    void handleFirstFrameDecoded(AVFrame* frame);
 
   signals:
     void mediaOpenStarted(const QString& filePath);

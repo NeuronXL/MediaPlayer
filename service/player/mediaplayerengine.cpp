@@ -9,7 +9,9 @@ MediaPlayerEngine::MediaPlayerEngine(LogService* logService, QObject* parent)
     , m_decoderThread(new QThread(this))
     , m_decoderWorker(new FFmpegDecoderWorker(logService))
     , m_hasOpenedMedia(false)
+    , m_playbackState(PlaybackState::Idle)
 {
+    qRegisterMetaType<PlaybackState>("PlaybackState");
     setupWorker();
 }
 
@@ -65,33 +67,64 @@ bool MediaPlayerEngine::hasOpenedMedia() const
     return m_hasOpenedMedia;
 }
 
+PlaybackState MediaPlayerEngine::playbackState() const
+{
+    return m_playbackState;
+}
+
 void MediaPlayerEngine::openMedia(const QString& filePath)
 {
+    if (filePath.isEmpty()) {
+        return;
+    }
+
+    setPlaybackState(PlaybackState::Opening);
     emit openMediaRequested(filePath);
 }
 
 void MediaPlayerEngine::closeMedia()
 {
+    m_hasOpenedMedia = false;
+    setPlaybackState(PlaybackState::Idle);
     emit closeMediaRequested();
 }
 
 void MediaPlayerEngine::play()
 {
+    if (!m_hasOpenedMedia) {
+        return;
+    }
+
+    setPlaybackState(PlaybackState::Playing);
     emit playRequested();
 }
 
 void MediaPlayerEngine::pause()
 {
+    if (!m_hasOpenedMedia) {
+        return;
+    }
+
+    setPlaybackState(PlaybackState::Paused);
     emit pauseRequested();
 }
 
 void MediaPlayerEngine::stop()
 {
+    if (!m_hasOpenedMedia) {
+        return;
+    }
+
+    setPlaybackState(PlaybackState::Stopped);
     emit stopRequested();
 }
 
 void MediaPlayerEngine::seek(qint64 positionMs)
 {
+    if (!m_hasOpenedMedia) {
+        return;
+    }
+
     emit seekRequested(positionMs);
 }
 
@@ -99,6 +132,7 @@ void MediaPlayerEngine::handleMediaOpened(const QString& filePath)
 {
     m_hasOpenedMedia = true;
     m_currentMediaPath = filePath;
+    setPlaybackState(PlaybackState::Ready);
     emit mediaOpened(filePath);
 }
 
@@ -106,6 +140,7 @@ void MediaPlayerEngine::handleMediaOpenFailed(const QString& filePath,
                                               const QString& reason)
 {
     m_hasOpenedMedia = false;
+    setPlaybackState(PlaybackState::Error);
     emit mediaOpenFailed(filePath, reason);
 }
 
@@ -114,7 +149,18 @@ void MediaPlayerEngine::handleCurrentMediaPathChanged(const QString& filePath)
     m_currentMediaPath = filePath;
     if (filePath.isEmpty()) {
         m_hasOpenedMedia = false;
+        setPlaybackState(PlaybackState::Idle);
     }
 
     emit currentMediaPathChanged(filePath);
+}
+
+void MediaPlayerEngine::setPlaybackState(PlaybackState state)
+{
+    if (m_playbackState == state) {
+        return;
+    }
+
+    m_playbackState = state;
+    emit playbackStateChanged(m_playbackState);
 }

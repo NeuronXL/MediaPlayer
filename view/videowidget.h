@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QWidget>
 
+#include "../service/player/playbackstate.h"
+
 namespace Ui
 {
 class VideoWidget;
@@ -19,20 +21,25 @@ class VideoWidget : public QWidget
     ~VideoWidget() override;
 
     void setFrame(const QImage& frame);
+    void setPlaybackState(PlaybackState state);
     void clearFrame();
 
   protected:
     void paintEvent(QPaintEvent* event) override;
 
   private slots:
-    void togglePlaybackState(bool playing);
+    void handlePlayButtonClicked();
+
+  signals:
+    void playRequested();
+    void pauseRequested();
 
   private:
     void updatePlayButtonAppearance();
 
     Ui::VideoWidget* ui;
     QImage m_currentFrame;
-    bool m_isPlaying;
+    PlaybackState m_playbackState;
 };
 
 #endif // VIDEOWIDGET_H

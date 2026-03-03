@@ -6,6 +6,8 @@
 #include <QThread>
 #include <QString>
 
+#include "playbackstate.h"
+
 class FFmpegDecoderWorker;
 class LogService;
 
@@ -19,6 +21,7 @@ class MediaPlayerEngine : public QObject
 
     QString currentMediaPath() const;
     bool hasOpenedMedia() const;
+    PlaybackState playbackState() const;
 
   public slots:
     void openMedia(const QString& filePath);
@@ -45,16 +48,19 @@ class MediaPlayerEngine : public QObject
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
     void currentMediaPathChanged(const QString& filePath);
+    void playbackStateChanged(PlaybackState state);
     void firstFrameReady(const QImage& frame);
 
   private:
     void setupWorker();
+    void setPlaybackState(PlaybackState state);
 
     LogService* m_logService;
     QThread* m_decoderThread;
     FFmpegDecoderWorker* m_decoderWorker;
     QString m_currentMediaPath;
     bool m_hasOpenedMedia;
+    PlaybackState m_playbackState;
 };
 
 #endif // MEDIAPLAYERENGINE_H

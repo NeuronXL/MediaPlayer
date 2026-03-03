@@ -9,7 +9,7 @@
 VideoWidget::VideoWidget(QWidget* parent)
     : QWidget(parent)
     , ui(new Ui::VideoWidget)
-    , m_isPlaying(false)
+    , m_playbackState(PlaybackState::Idle)
 {
     ui->setupUi(this);
     setAutoFillBackground(true);
@@ -18,8 +18,9 @@ VideoWidget::VideoWidget(QWidget* parent)
     palette.setColor(QPalette::Window, QColor(18, 18, 18));
     setPalette(palette);
 
-    connect(ui->playButton, &QPushButton::toggled, this,
-            &VideoWidget::togglePlaybackState);
+    ui->playButton->setCheckable(false);
+    connect(ui->playButton, &QPushButton::clicked, this,
+            &VideoWidget::handlePlayButtonClicked);
     updatePlayButtonAppearance();
 }
 
@@ -32,6 +33,16 @@ void VideoWidget::setFrame(const QImage& frame)
 {
     m_currentFrame = frame;
     update();
+}
+
+void VideoWidget::setPlaybackState(PlaybackState state)
+{
+    if (m_playbackState == state) {
+        return;
+    }
+
+    m_playbackState = state;
+    updatePlayButtonAppearance();
 }
 
 void VideoWidget::clearFrame()
@@ -61,15 +72,21 @@ void VideoWidget::paintEvent(QPaintEvent* event)
     painter.drawImage(topLeft, scaledFrame);
 }
 
-void VideoWidget::togglePlaybackState(bool playing)
+void VideoWidget::handlePlayButtonClicked()
 {
-    m_isPlaying = playing;
-    updatePlayButtonAppearance();
+    if (m_playbackState == PlaybackState::Playing) {
+        emit pauseRequested();
+        return;
+    }
+
+    emit playRequested();
 }
 
 void VideoWidget::updatePlayButtonAppearance()
 {
     ui->playButton->setIcon(QIcon());
-    ui->playButton->setToolTip(m_isPlaying ? tr("Pause") : tr("Play"));
-    ui->playButton->setStatusTip(m_isPlaying ? tr("Pause") : tr("Play"));
+    const bool isPlaying = (m_playbackState == PlaybackState::Playing);
+    ui->playButton->setText(isPlaying ? tr("Pause") : tr("Play"));
+    ui->playButton->setToolTip(isPlaying ? tr("Pause") : tr("Play"));
+    ui->playButton->setStatusTip(isPlaying ? tr("Pause") : tr("Play"));
 }
