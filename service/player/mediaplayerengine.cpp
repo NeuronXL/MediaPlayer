@@ -128,6 +128,15 @@ void MediaPlayerEngine::play()
         return;
     }
 
+    if (m_playbackState == PlaybackState::Ended) {
+        m_playbackTimer->stop();
+        resetFrameQueue();
+        setPlaybackState(PlaybackState::Playing);
+        emit workerPlaybackStateChanged(m_playbackState);
+        emit seekRequested(0);
+        return;
+    }
+
     setPlaybackState(PlaybackState::Playing);
     emit workerPlaybackStateChanged(m_playbackState);
     scheduleNextPlaybackTick();
@@ -142,19 +151,6 @@ void MediaPlayerEngine::pause()
     m_playbackTimer->stop();
     setPlaybackState(PlaybackState::Paused);
     emit workerPlaybackStateChanged(m_playbackState);
-}
-
-void MediaPlayerEngine::stop()
-{
-    if (!m_hasOpenedMedia) {
-        return;
-    }
-
-    m_playbackTimer->stop();
-    resetFrameQueue();
-    setPlaybackState(PlaybackState::Stopped);
-    emit workerPlaybackStateChanged(m_playbackState);
-    emit seekRequested(0);
 }
 
 void MediaPlayerEngine::seek(qint64 positionMs)
@@ -194,12 +190,6 @@ void MediaPlayerEngine::handleDecodedFrame(const PlaybackFrame& frame)
 void MediaPlayerEngine::handleEndOfStreamReached()
 {
     m_endOfStreamPending = true;
-    if (m_playbackFrameQueue.isEmpty() &&
-        m_playbackState == PlaybackState::Playing) {
-        m_playbackTimer->stop();
-        setPlaybackState(PlaybackState::Stopped);
-        emit workerPlaybackStateChanged(m_playbackState);
-    }
 }
 
 void MediaPlayerEngine::handleMediaOpened(const QString& filePath)
@@ -262,7 +252,12 @@ void MediaPlayerEngine::handlePlaybackTick()
     if (m_playbackFrameQueue.isEmpty()) {
         m_playbackTimer->stop();
         if (m_endOfStreamPending) {
-            setPlaybackState(PlaybackState::Stopped);
+            if (m_mediaInfo.durationMs > 0 &&
+                m_currentPositionMs != m_mediaInfo.durationMs) {
+                m_currentPositionMs = m_mediaInfo.durationMs;
+                emit currentPositionChanged(m_currentPositionMs);
+            }
+            setPlaybackState(PlaybackState::Ended);
             emit workerPlaybackStateChanged(m_playbackState);
         }
         syncWorkerBufferedState();
@@ -277,6 +272,15 @@ void MediaPlayerEngine::handlePlaybackTick()
     }
     emit frameReady(frame.image);
     syncWorkerBufferedState();
+
+    if (m_playbackFrameQueue.isEmpty() && m_endOfStreamPending) {
+        const int endDelayMs = qMax<int>(
+            1, frame.durationMs > 0 ? static_cast<int>(frame.durationMs)
+                                    : m_playbackIntervalMs);
+        m_playbackTimer->start(endDelayMs);
+        return;
+    }
+
     scheduleNextPlaybackTick();
 }
 

@@ -113,6 +113,8 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_playbackControlWidget, &PlaybackControlWidget::pauseRequested,
             m_viewModel,
             &MainWindowViewModel::pausePlayback);
+    connect(m_playbackControlWidget, &PlaybackControlWidget::seekRequested,
+            m_viewModel, &MainWindowViewModel::seekPlayback);
 
     m_playbackControlWidget->setPlaybackState(m_viewModel->playbackState());
     m_playbackControlWidget->setMediaInfo(m_viewModel->mediaInfo());

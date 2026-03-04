@@ -31,6 +31,7 @@ class MainWindowViewModel : public QObject
     void pausePlayback();
     void playPlayback();
     void requestOpenFile();
+    void seekPlayback(qint64 positionMs);
     void setSelectedFilePath(const QString& filePath);
 
   private slots:

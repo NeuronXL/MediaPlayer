@@ -80,6 +80,11 @@ void MainWindowViewModel::requestOpenFile()
     emit openFileRequested();
 }
 
+void MainWindowViewModel::seekPlayback(qint64 positionMs)
+{
+    m_mediaPlayerEngine->seek(positionMs);
+}
+
 void MainWindowViewModel::handleCurrentMediaPathChanged(const QString& filePath)
 {
     if (m_selectedFilePath == filePath) {

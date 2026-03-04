@@ -35,7 +35,6 @@ class MediaPlayerEngine : public QObject
     void closeMedia();
     void play();
     void pause();
-    void stop();
     void seek(qint64 positionMs);
 
   private slots:

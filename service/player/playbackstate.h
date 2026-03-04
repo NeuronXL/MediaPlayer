@@ -10,7 +10,7 @@ enum class PlaybackState
     Ready,
     Playing,
     Paused,
-    Stopped,
+    Ended,
     Seeking,
     Error
 };
