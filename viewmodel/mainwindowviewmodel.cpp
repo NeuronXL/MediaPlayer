@@ -20,6 +20,8 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
             this, &MainWindowViewModel::handleCurrentMediaPathChanged);
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::firstFrameReady, this,
             &MainWindowViewModel::previewFrameChanged);
+    connect(m_mediaPlayerEngine, &MediaPlayerEngine::frameReady, this,
+            &MainWindowViewModel::previewFrameChanged);
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::playbackStateChanged, this,
             &MainWindowViewModel::handlePlaybackStateChanged);
 }

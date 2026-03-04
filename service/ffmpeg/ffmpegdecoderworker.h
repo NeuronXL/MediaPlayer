@@ -1,9 +1,10 @@
 #ifndef FFMPEGDECODERWORKER_H
 #define FFMPEGDECODERWORKER_H
 
-#include <QObject>
 #include <QImage>
+#include <QObject>
 #include <QString>
+#include <QTimer>
 
 struct AVFrame;
 
@@ -15,7 +16,8 @@ class FFmpegDecoderWorker : public QObject
     Q_OBJECT
 
   public:
-    explicit FFmpegDecoderWorker(LogService* logService, QObject* parent = nullptr);
+    explicit FFmpegDecoderWorker(LogService* logService,
+                                 QObject* parent = nullptr);
     ~FFmpegDecoderWorker() override;
 
   public slots:
@@ -27,16 +29,21 @@ class FFmpegDecoderWorker : public QObject
     void seek(qint64 positionMs);
 
   private slots:
-    void handleFirstFrameDecoded(AVFrame* frame);
+    void handleDecodedFrame(AVFrame* frame);
+    void handlePlaybackTick();
 
   signals:
+    void playbackPaused();
+    void playbackStarted();
     void mediaOpenStarted(const QString& filePath);
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
     void currentMediaPathChanged(const QString& filePath);
     void firstFrameReady(const QImage& frame);
+    void frameReady(const QImage& frame);
 
   private:
+    QTimer* m_playbackTimer;
     LogService* m_logService;
     FFmpegMediaDecoder* m_mediaDecoder;
 };

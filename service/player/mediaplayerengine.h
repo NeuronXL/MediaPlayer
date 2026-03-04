@@ -1,10 +1,10 @@
 #ifndef MEDIAPLAYERENGINE_H
 #define MEDIAPLAYERENGINE_H
 
-#include <QObject>
 #include <QImage>
-#include <QThread>
+#include <QObject>
 #include <QString>
+#include <QThread>
 
 #include "playbackstate.h"
 
@@ -16,7 +16,8 @@ class MediaPlayerEngine : public QObject
     Q_OBJECT
 
   public:
-    explicit MediaPlayerEngine(LogService* logService, QObject* parent = nullptr);
+    explicit MediaPlayerEngine(LogService* logService,
+                               QObject* parent = nullptr);
     ~MediaPlayerEngine() override;
 
     QString currentMediaPath() const;
@@ -33,8 +34,11 @@ class MediaPlayerEngine : public QObject
 
   private slots:
     void handleMediaOpened(const QString& filePath);
-    void handleMediaOpenFailed(const QString& filePath, const QString& reason);
+    void handleMediaOpenFailed(const QString& filePath,
+                               const QString& reason);
     void handleCurrentMediaPathChanged(const QString& filePath);
+    void handlePlaybackPaused();
+    void handlePlaybackStarted();
 
   signals:
     void openMediaRequested(const QString& filePath);
@@ -50,6 +54,7 @@ class MediaPlayerEngine : public QObject
     void currentMediaPathChanged(const QString& filePath);
     void playbackStateChanged(PlaybackState state);
     void firstFrameReady(const QImage& frame);
+    void frameReady(const QImage& frame);
 
   private:
     void setupWorker();

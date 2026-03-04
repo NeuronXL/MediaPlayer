@@ -42,16 +42,21 @@ void MediaPlayerEngine::setupWorker()
     connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenStarted, this,
             &MediaPlayerEngine::mediaOpenStarted, Qt::QueuedConnection);
     connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpened, this,
-            &MediaPlayerEngine::handleMediaOpened,
-            Qt::QueuedConnection);
+            &MediaPlayerEngine::handleMediaOpened, Qt::QueuedConnection);
     connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenFailed, this,
-            &MediaPlayerEngine::handleMediaOpenFailed,
+            &MediaPlayerEngine::handleMediaOpenFailed, Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::currentMediaPathChanged,
+            this, &MediaPlayerEngine::handleCurrentMediaPathChanged,
             Qt::QueuedConnection);
-    connect(m_decoderWorker, &FFmpegDecoderWorker::currentMediaPathChanged, this,
-            &MediaPlayerEngine::handleCurrentMediaPathChanged,
+    connect(m_decoderWorker, &FFmpegDecoderWorker::playbackStarted, this,
+            &MediaPlayerEngine::handlePlaybackStarted,
             Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::playbackPaused, this,
+            &MediaPlayerEngine::handlePlaybackPaused, Qt::QueuedConnection);
     connect(m_decoderWorker, &FFmpegDecoderWorker::firstFrameReady, this,
             &MediaPlayerEngine::firstFrameReady, Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::frameReady, this,
+            &MediaPlayerEngine::frameReady, Qt::QueuedConnection);
 
     m_decoderThread->start();
 }
@@ -94,7 +99,6 @@ void MediaPlayerEngine::play()
         return;
     }
 
-    setPlaybackState(PlaybackState::Playing);
     emit playRequested();
 }
 
@@ -104,7 +108,6 @@ void MediaPlayerEngine::pause()
         return;
     }
 
-    setPlaybackState(PlaybackState::Paused);
     emit pauseRequested();
 }
 
@@ -152,6 +155,16 @@ void MediaPlayerEngine::handleCurrentMediaPathChanged(const QString& filePath)
     }
 
     emit currentMediaPathChanged(filePath);
+}
+
+void MediaPlayerEngine::handlePlaybackPaused()
+{
+    setPlaybackState(PlaybackState::Paused);
+}
+
+void MediaPlayerEngine::handlePlaybackStarted()
+{
+    setPlaybackState(PlaybackState::Playing);
 }
 
 void MediaPlayerEngine::setPlaybackState(PlaybackState state)
