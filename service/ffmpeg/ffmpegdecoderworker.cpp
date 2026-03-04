@@ -77,8 +77,40 @@ void FFmpegDecoderWorker::stop()
 
 void FFmpegDecoderWorker::seek(qint64 positionMs)
 {
-    Q_UNUSED(positionMs);
-    // TODO: Implement seeking in the decode worker.
+    if (!m_mediaDecoder->hasOpenedMedia()) {
+        return;
+    }
+
+    const bool wasPlaying = m_playbackTimer->isActive();
+    if (wasPlaying) {
+        m_playbackTimer->stop();
+    }
+
+    QString errorMessage;
+    if (!m_mediaDecoder->seekTo(positionMs, &errorMessage)) {
+        if (m_logService != nullptr && !errorMessage.isEmpty()) {
+            m_logService->append(errorMessage);
+        }
+        return;
+    }
+
+    switch (m_mediaDecoder->decodeNextFrame()) {
+    case DecodeFrameResult::FrameReady:
+        break;
+    case DecodeFrameResult::EndOfStream:
+        if (m_logService != nullptr) {
+            m_logService->append(tr("Reached end of video stream."));
+        }
+        break;
+    case DecodeFrameResult::NoMedia:
+        break;
+    case DecodeFrameResult::Error:
+        break;
+    }
+
+    if (wasPlaying) {
+        m_playbackTimer->start(m_mediaDecoder->frameIntervalMs());
+    }
 }
 
 void FFmpegDecoderWorker::handleDecodedFrame(AVFrame* frame)

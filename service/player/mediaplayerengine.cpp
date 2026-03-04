@@ -136,6 +136,7 @@ void MediaPlayerEngine::handleMediaOpened(const QString& filePath)
     m_currentMediaPath = filePath;
     setPlaybackState(PlaybackState::Ready);
     emit mediaOpened(filePath);
+    emit seekRequested(0);
 }
 
 void MediaPlayerEngine::handleMediaOpenFailed(const QString& filePath,
