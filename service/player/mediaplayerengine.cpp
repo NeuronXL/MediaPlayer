@@ -15,6 +15,7 @@ MediaPlayerEngine::MediaPlayerEngine(LogService* logService, QObject* parent)
     , m_endOfStreamPending(false)
     , m_playbackIntervalMs(33)
     , m_lastRenderedPtsMs(-1)
+    , m_currentPositionMs(0)
     , m_playbackState(PlaybackState::Idle)
 {
     m_playbackTimer->setSingleShot(false);
@@ -43,6 +44,8 @@ MediaPlayerEngine::MediaPlayerEngine(LogService* logService, QObject* parent)
     connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenFailed,
             this, &MediaPlayerEngine::handleMediaOpenFailed,
             Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::mediaInfoReady, this,
+            &MediaPlayerEngine::handleMediaInfoReady, Qt::QueuedConnection);
     connect(m_decoderWorker, &FFmpegDecoderWorker::currentMediaPathChanged, this,
             &MediaPlayerEngine::handleCurrentMediaPathChanged,
             Qt::QueuedConnection);
@@ -78,9 +81,19 @@ bool MediaPlayerEngine::hasOpenedMedia() const
     return m_hasOpenedMedia;
 }
 
+MediaInfo MediaPlayerEngine::mediaInfo() const
+{
+    return m_mediaInfo;
+}
+
 PlaybackState MediaPlayerEngine::playbackState() const
 {
     return m_playbackState;
+}
+
+qint64 MediaPlayerEngine::currentPositionMs() const
+{
+    return m_currentPositionMs;
 }
 
 void MediaPlayerEngine::openMedia(const QString& filePath)
@@ -90,8 +103,11 @@ void MediaPlayerEngine::openMedia(const QString& filePath)
     }
 
     m_playbackTimer->stop();
+    m_mediaInfo = {};
     setPlaybackState(PlaybackState::Opening);
     resetFrameQueue();
+    emit mediaInfoChanged(m_mediaInfo);
+    emit durationChanged(0);
     emit workerPlaybackStateChanged(m_playbackState);
     emit openMediaRequested(filePath);
 }
@@ -100,8 +116,11 @@ void MediaPlayerEngine::closeMedia()
 {
     m_hasOpenedMedia = false;
     m_playbackTimer->stop();
+    m_mediaInfo = {};
     setPlaybackState(PlaybackState::Idle);
     resetFrameQueue();
+    emit mediaInfoChanged(m_mediaInfo);
+    emit durationChanged(0);
     emit workerPlaybackStateChanged(m_playbackState);
     emit closeMediaRequested();
 }
@@ -167,6 +186,10 @@ void MediaPlayerEngine::handleDecodedFrame(const PlaybackFrame& frame)
 
     if (wasEmpty) {
         m_lastRenderedPtsMs = frame.ptsMs;
+        if (m_currentPositionMs != frame.ptsMs) {
+            m_currentPositionMs = frame.ptsMs;
+            emit currentPositionChanged(m_currentPositionMs);
+        }
         emit firstFrameReady(frame.image);
     }
 }
@@ -199,10 +222,20 @@ void MediaPlayerEngine::handleMediaOpenFailed(const QString& filePath,
 {
     m_hasOpenedMedia = false;
     m_playbackTimer->stop();
+    m_mediaInfo = {};
     resetFrameQueue();
     setPlaybackState(PlaybackState::Error);
+    emit mediaInfoChanged(m_mediaInfo);
+    emit durationChanged(0);
     emit workerPlaybackStateChanged(m_playbackState);
     emit mediaOpenFailed(filePath, reason);
+}
+
+void MediaPlayerEngine::handleMediaInfoReady(const MediaInfo& mediaInfo)
+{
+    m_mediaInfo = mediaInfo;
+    emit mediaInfoChanged(m_mediaInfo);
+    emit durationChanged(m_mediaInfo.durationMs);
 }
 
 void MediaPlayerEngine::handleCurrentMediaPathChanged(const QString& filePath)
@@ -211,8 +244,11 @@ void MediaPlayerEngine::handleCurrentMediaPathChanged(const QString& filePath)
     if (filePath.isEmpty()) {
         m_hasOpenedMedia = false;
         m_playbackTimer->stop();
+        m_mediaInfo = {};
         resetFrameQueue();
         setPlaybackState(PlaybackState::Idle);
+        emit mediaInfoChanged(m_mediaInfo);
+        emit durationChanged(0);
         emit workerPlaybackStateChanged(m_playbackState);
     }
 
@@ -238,6 +274,10 @@ void MediaPlayerEngine::handlePlaybackTick()
 
     const PlaybackFrame frame = m_playbackFrameQueue.dequeue();
     m_lastRenderedPtsMs = frame.ptsMs;
+    if (m_currentPositionMs != frame.ptsMs) {
+        m_currentPositionMs = frame.ptsMs;
+        emit currentPositionChanged(m_currentPositionMs);
+    }
     emit frameReady(frame.image);
     syncWorkerBufferedState();
     scheduleNextPlaybackTick();
@@ -266,8 +306,11 @@ void MediaPlayerEngine::handleSeekFailed(qint64 positionMs, const QString& reaso
     }
 
     m_hasOpenedMedia = false;
+    m_mediaInfo = {};
     resetFrameQueue();
     setPlaybackState(PlaybackState::Error);
+    emit mediaInfoChanged(m_mediaInfo);
+    emit durationChanged(0);
     emit mediaOpenFailed(m_currentMediaPath, reason);
 }
 
@@ -286,6 +329,10 @@ void MediaPlayerEngine::resetFrameQueue()
     m_playbackFrameQueue.clear();
     m_endOfStreamPending = false;
     m_lastRenderedPtsMs = -1;
+    if (m_currentPositionMs != 0) {
+        m_currentPositionMs = 0;
+        emit currentPositionChanged(m_currentPositionMs);
+    }
     syncWorkerBufferedState();
 }
 

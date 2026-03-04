@@ -6,6 +6,7 @@
 #include <QTimer>
 
 #include "../player/playbackframe.h"
+#include "../player/mediainfo.h"
 #include "../player/playbackstate.h"
 
 struct AVFrame;
@@ -47,6 +48,7 @@ class FFmpegDecoderWorker : public QObject
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
     void currentMediaPathChanged(const QString& filePath);
+    void mediaInfoReady(const MediaInfo& mediaInfo);
     void frameDecoded(const PlaybackFrame& frame);
 
   private:

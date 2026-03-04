@@ -9,6 +9,7 @@
 #include <QTimer>
 
 #include "playbackframe.h"
+#include "mediainfo.h"
 #include "playbackstate.h"
 
 class FFmpegDecoderWorker;
@@ -25,7 +26,9 @@ class MediaPlayerEngine : public QObject
 
     QString currentMediaPath() const;
     bool hasOpenedMedia() const;
+    MediaInfo mediaInfo() const;
     PlaybackState playbackState() const;
+    qint64 currentPositionMs() const;
 
   public slots:
     void openMedia(const QString& filePath);
@@ -41,6 +44,7 @@ class MediaPlayerEngine : public QObject
     void handleMediaOpened(const QString& filePath);
     void handleMediaOpenFailed(const QString& filePath,
                                const QString& reason);
+    void handleMediaInfoReady(const MediaInfo& mediaInfo);
     void handleCurrentMediaPathChanged(const QString& filePath);
     void handlePlaybackTick();
     void handlePlaybackIntervalChanged(int intervalMs);
@@ -56,7 +60,10 @@ class MediaPlayerEngine : public QObject
     void mediaOpenStarted(const QString& filePath);
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
+    void mediaInfoChanged(const MediaInfo& mediaInfo);
     void currentMediaPathChanged(const QString& filePath);
+    void currentPositionChanged(qint64 positionMs);
+    void durationChanged(qint64 durationMs);
     void playbackStateChanged(PlaybackState state);
     void firstFrameReady(const QImage& frame);
     void frameReady(const QImage& frame);
@@ -74,10 +81,12 @@ class MediaPlayerEngine : public QObject
     FFmpegDecoderWorker* m_decoderWorker;
     QQueue<PlaybackFrame> m_playbackFrameQueue;
     QString m_currentMediaPath;
+    MediaInfo m_mediaInfo;
     bool m_hasOpenedMedia;
     bool m_endOfStreamPending;
     int m_playbackIntervalMs;
     qint64 m_lastRenderedPtsMs;
+    qint64 m_currentPositionMs;
     PlaybackState m_playbackState;
 };
 

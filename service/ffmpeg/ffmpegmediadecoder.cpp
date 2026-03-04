@@ -46,6 +46,11 @@ bool FFmpegMediaDecoder::hasOpenedMedia() const
     return !m_currentMediaPath.isEmpty();
 }
 
+MediaInfo FFmpegMediaDecoder::mediaInfo() const
+{
+    return m_mediaInfo;
+}
+
 bool FFmpegMediaDecoder::seekTo(qint64 positionMs, QString* errorMessage)
 {
     if (m_formatContext == nullptr || m_codecContext == nullptr ||
@@ -121,6 +126,7 @@ void FFmpegMediaDecoder::openMedia(const QString& filePath)
     }
 
     resetDecoderSession();
+    m_mediaInfo = {};
 
     const QByteArray filePathUtf8 = filePath.toUtf8();
     int ret = avformat_open_input(&m_formatContext, filePathUtf8.constData(),
@@ -195,11 +201,31 @@ void FFmpegMediaDecoder::openMedia(const QString& filePath)
         const double fps = av_q2d(frameRate);
         if (fps > 0.0) {
             m_frameIntervalMs = qMax(8, qRound(1000.0 / fps));
+            m_mediaInfo.frameRate = fps;
         }
     }
 
     m_currentMediaPath = filePath;
+    m_mediaInfo.filePath = filePath;
+    m_mediaInfo.containerFormat =
+        m_formatContext->iformat != nullptr
+            ? QString::fromUtf8(m_formatContext->iformat->long_name != nullptr
+                                    ? m_formatContext->iformat->long_name
+                                    : m_formatContext->iformat->name)
+            : QString();
+    m_mediaInfo.videoCodec =
+        codec != nullptr && codec->name != nullptr
+            ? QString::fromUtf8(codec->name)
+            : QString();
+    m_mediaInfo.durationMs =
+        m_formatContext->duration > 0
+            ? m_formatContext->duration / (AV_TIME_BASE / 1000)
+            : 0;
+    m_mediaInfo.width = videoStream->codecpar->width;
+    m_mediaInfo.height = videoStream->codecpar->height;
+
     emit currentMediaPathChanged(m_currentMediaPath);
+    emit mediaInfoUpdated(m_mediaInfo);
     emit mediaOpened(m_currentMediaPath);
 }
 
@@ -210,6 +236,7 @@ void FFmpegMediaDecoder::closeMedia()
     }
 
     resetDecoderSession();
+    m_mediaInfo = {};
     m_currentMediaPath.clear();
     emit currentMediaPathChanged(m_currentMediaPath);
 }
@@ -358,4 +385,5 @@ void FFmpegMediaDecoder::resetDecoderSession()
     m_videoStreamIndex = -1;
     m_frameIntervalMs = 33;
     m_isFlushing = false;
+    m_mediaInfo = {};
 }

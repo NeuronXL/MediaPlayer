@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QString>
 
+#include "../player/mediainfo.h"
+
 enum class DecodeFrameResult
 {
     NoMedia,
@@ -30,6 +32,7 @@ class FFmpegMediaDecoder : public QObject
     QString currentMediaPath() const;
     int frameIntervalMs() const;
     bool hasOpenedMedia() const;
+    MediaInfo mediaInfo() const;
     DecodeFrameResult decodeNextFrame();
     bool seekTo(qint64 positionMs, QString* errorMessage = nullptr);
 
@@ -42,6 +45,7 @@ class FFmpegMediaDecoder : public QObject
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
     void currentMediaPathChanged(const QString& filePath);
+    void mediaInfoUpdated(const MediaInfo& mediaInfo);
     void frameDecoded(AVFrame* frame, qint64 ptsMs, qint64 durationMs,
                       bool isKeyFrame);
 
@@ -61,6 +65,7 @@ class FFmpegMediaDecoder : public QObject
     int m_frameIntervalMs;
     bool m_isFlushing;
     QString m_currentMediaPath;
+    MediaInfo m_mediaInfo;
 };
 
 #endif // FFMPEGMEDIADECODER_H

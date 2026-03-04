@@ -3,6 +3,7 @@
 
 #include <QWidget>
 
+#include "../service/player/mediainfo.h"
 #include "../service/player/playbackstate.h"
 
 namespace Ui
@@ -18,6 +19,8 @@ class PlaybackControlWidget : public QWidget
     explicit PlaybackControlWidget(QWidget* parent = nullptr);
     ~PlaybackControlWidget() override;
 
+    void setCurrentPosition(qint64 positionMs);
+    void setMediaInfo(const MediaInfo& mediaInfo);
     void setPlaybackState(PlaybackState state);
 
   signals:
@@ -28,9 +31,12 @@ class PlaybackControlWidget : public QWidget
     void handlePlayButtonClicked();
 
   private:
+    QString formatTime(qint64 positionMs) const;
     void updatePlayButtonAppearance();
 
     Ui::PlaybackControlWidget* ui;
+    qint64 m_currentPositionMs;
+    qint64 m_durationMs;
     PlaybackState m_playbackState;
 };
 

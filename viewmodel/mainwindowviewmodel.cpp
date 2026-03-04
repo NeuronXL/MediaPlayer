@@ -8,6 +8,7 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
     : QObject(parent)
     , m_logService(new LogService(this))
     , m_mediaPlayerEngine(new MediaPlayerEngine(m_logService, this))
+    , m_currentPositionMs(0)
     , m_playbackState(PlaybackState::Idle)
 {
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaOpenStarted, this,
@@ -16,8 +17,14 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
             &MainWindowViewModel::handleMediaOpened);
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaOpenFailed, this,
             &MainWindowViewModel::handleMediaOpenFailed);
+    connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaInfoChanged, this,
+            &MainWindowViewModel::handleMediaInfoChanged);
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::currentMediaPathChanged,
             this, &MainWindowViewModel::handleCurrentMediaPathChanged);
+    connect(m_mediaPlayerEngine, &MediaPlayerEngine::currentPositionChanged,
+            this, &MainWindowViewModel::handleCurrentPositionChanged);
+    connect(m_mediaPlayerEngine, &MediaPlayerEngine::durationChanged, this,
+            &MainWindowViewModel::durationChanged);
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::firstFrameReady, this,
             &MainWindowViewModel::previewFrameChanged);
     connect(m_mediaPlayerEngine, &MediaPlayerEngine::frameReady, this,
@@ -33,9 +40,19 @@ LogModel* MainWindowViewModel::logModel() const
     return m_logService->model();
 }
 
+MediaInfo MainWindowViewModel::mediaInfo() const
+{
+    return m_mediaInfo;
+}
+
 PlaybackState MainWindowViewModel::playbackState() const
 {
     return m_playbackState;
+}
+
+qint64 MainWindowViewModel::currentPositionMs() const
+{
+    return m_currentPositionMs;
 }
 
 QString MainWindowViewModel::selectedFilePath() const
@@ -89,9 +106,25 @@ void MainWindowViewModel::handleMediaOpenFailed(const QString& filePath,
     appendLog(tr("Failed to load media file: %1 (%2)").arg(filePath, reason));
 }
 
+void MainWindowViewModel::handleMediaInfoChanged(const MediaInfo& mediaInfo)
+{
+    m_mediaInfo = mediaInfo;
+    emit mediaInfoChanged(m_mediaInfo);
+}
+
 void MainWindowViewModel::handleMediaOpenStarted(const QString& filePath)
 {
     appendLog(tr("Opening media file: %1").arg(filePath));
+}
+
+void MainWindowViewModel::handleCurrentPositionChanged(qint64 positionMs)
+{
+    if (m_currentPositionMs == positionMs) {
+        return;
+    }
+
+    m_currentPositionMs = positionMs;
+    emit currentPositionChanged(m_currentPositionMs);
 }
 
 void MainWindowViewModel::handlePlaybackStateChanged(PlaybackState state)

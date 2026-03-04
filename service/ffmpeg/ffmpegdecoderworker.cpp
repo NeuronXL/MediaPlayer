@@ -33,6 +33,8 @@ FFmpegDecoderWorker::FFmpegDecoderWorker(LogService* logService,
             &FFmpegDecoderWorker::handleMediaOpenFailedInternal);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::currentMediaPathChanged, this,
             &FFmpegDecoderWorker::handleCurrentMediaPathChangedInternal);
+    connect(m_mediaDecoder, &FFmpegMediaDecoder::mediaInfoUpdated, this,
+            &FFmpegDecoderWorker::mediaInfoReady);
     connect(m_mediaDecoder, &FFmpegMediaDecoder::frameDecoded, this,
             &FFmpegDecoderWorker::handleDecodedFrame);
 }

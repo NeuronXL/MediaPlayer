@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 
+struct MediaInfo;
+
 class LogWidget;
 class MainWindowViewModel;
 class PlaybackControlWidget;
@@ -25,6 +27,7 @@ class MainWindow : public QMainWindow
   private slots:
     void handleDebugPanelAnimationFinished();
     void handleDebugPanelAnimationValueChanged(const QVariant& value);
+    void handleMediaInfoChanged(const MediaInfo& mediaInfo);
     void openFileDialog();
     void toggleDebugPanel();
     void updateSelectedFilePath(const QString& filePath);
