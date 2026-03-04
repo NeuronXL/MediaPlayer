@@ -42,10 +42,13 @@ class FFmpegMediaDecoder : public QObject
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
     void currentMediaPathChanged(const QString& filePath);
-    void frameDecoded(AVFrame* frame);
+    void frameDecoded(AVFrame* frame, qint64 ptsMs, qint64 durationMs,
+                      bool isKeyFrame);
 
   private:
     DecodeFrameResult decodeNextFrame(const QString& filePath);
+    qint64 frameDurationMs(const AVFrame* frame) const;
+    qint64 framePositionMs(const AVFrame* frame) const;
     bool isSupportedVideoFile(const QString& filePath) const;
     void resetDecoderSession();
 

@@ -1,5 +1,7 @@
 #include "mediaplayerengine.h"
 
+#include <QtGlobal>
+
 #include "../ffmpeg/ffmpegdecoderworker.h"
 #include "../logging/logservice.h"
 
@@ -7,21 +9,17 @@ MediaPlayerEngine::MediaPlayerEngine(LogService* logService, QObject* parent)
     : QObject(parent)
     , m_logService(logService)
     , m_decoderThread(new QThread(this))
+    , m_playbackTimer(new QTimer(this))
     , m_decoderWorker(new FFmpegDecoderWorker(logService))
     , m_hasOpenedMedia(false)
+    , m_endOfStreamPending(false)
+    , m_playbackIntervalMs(33)
+    , m_lastRenderedPtsMs(-1)
     , m_playbackState(PlaybackState::Idle)
 {
-    setupWorker();
-}
+    m_playbackTimer->setSingleShot(false);
+    m_playbackTimer->setTimerType(Qt::PreciseTimer);
 
-MediaPlayerEngine::~MediaPlayerEngine()
-{
-    m_decoderThread->quit();
-    m_decoderThread->wait();
-}
-
-void MediaPlayerEngine::setupWorker()
-{
     m_decoderWorker->moveToThread(m_decoderThread);
     connect(m_decoderThread, &QThread::finished, m_decoderWorker,
             &QObject::deleteLater);
@@ -30,35 +28,44 @@ void MediaPlayerEngine::setupWorker()
             &FFmpegDecoderWorker::openMedia, Qt::QueuedConnection);
     connect(this, &MediaPlayerEngine::closeMediaRequested, m_decoderWorker,
             &FFmpegDecoderWorker::closeMedia, Qt::QueuedConnection);
-    connect(this, &MediaPlayerEngine::playRequested, m_decoderWorker,
-            &FFmpegDecoderWorker::play, Qt::QueuedConnection);
-    connect(this, &MediaPlayerEngine::pauseRequested, m_decoderWorker,
-            &FFmpegDecoderWorker::pause, Qt::QueuedConnection);
-    connect(this, &MediaPlayerEngine::stopRequested, m_decoderWorker,
-            &FFmpegDecoderWorker::stop, Qt::QueuedConnection);
     connect(this, &MediaPlayerEngine::seekRequested, m_decoderWorker,
             &FFmpegDecoderWorker::seek, Qt::QueuedConnection);
+    connect(this, &MediaPlayerEngine::workerPlaybackStateChanged, m_decoderWorker,
+            &FFmpegDecoderWorker::setPlaybackState, Qt::QueuedConnection);
+    connect(this, &MediaPlayerEngine::workerBufferedStateChanged,
+            m_decoderWorker, &FFmpegDecoderWorker::updateBufferedState,
+            Qt::QueuedConnection);
 
     connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenStarted, this,
             &MediaPlayerEngine::mediaOpenStarted, Qt::QueuedConnection);
     connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpened, this,
             &MediaPlayerEngine::handleMediaOpened, Qt::QueuedConnection);
-    connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenFailed, this,
-            &MediaPlayerEngine::handleMediaOpenFailed, Qt::QueuedConnection);
-    connect(m_decoderWorker, &FFmpegDecoderWorker::currentMediaPathChanged,
-            this, &MediaPlayerEngine::handleCurrentMediaPathChanged,
+    connect(m_decoderWorker, &FFmpegDecoderWorker::mediaOpenFailed,
+            this, &MediaPlayerEngine::handleMediaOpenFailed,
             Qt::QueuedConnection);
-    connect(m_decoderWorker, &FFmpegDecoderWorker::playbackStarted, this,
-            &MediaPlayerEngine::handlePlaybackStarted,
+    connect(m_decoderWorker, &FFmpegDecoderWorker::currentMediaPathChanged, this,
+            &MediaPlayerEngine::handleCurrentMediaPathChanged,
             Qt::QueuedConnection);
-    connect(m_decoderWorker, &FFmpegDecoderWorker::playbackPaused, this,
-            &MediaPlayerEngine::handlePlaybackPaused, Qt::QueuedConnection);
-    connect(m_decoderWorker, &FFmpegDecoderWorker::firstFrameReady, this,
-            &MediaPlayerEngine::firstFrameReady, Qt::QueuedConnection);
-    connect(m_decoderWorker, &FFmpegDecoderWorker::frameReady, this,
-            &MediaPlayerEngine::frameReady, Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::seekFailed, this,
+            &MediaPlayerEngine::handleSeekFailed, Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::frameDecoded, this,
+            &MediaPlayerEngine::handleDecodedFrame, Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::endOfStreamReached, this,
+            &MediaPlayerEngine::handleEndOfStreamReached,
+            Qt::QueuedConnection);
+    connect(m_decoderWorker, &FFmpegDecoderWorker::playbackIntervalChanged, this,
+            &MediaPlayerEngine::handlePlaybackIntervalChanged,
+            Qt::QueuedConnection);
+    connect(m_playbackTimer, &QTimer::timeout, this,
+            &MediaPlayerEngine::handlePlaybackTick);
 
     m_decoderThread->start();
+}
+
+MediaPlayerEngine::~MediaPlayerEngine()
+{
+    m_decoderThread->quit();
+    m_decoderThread->wait();
 }
 
 QString MediaPlayerEngine::currentMediaPath() const
@@ -82,33 +89,43 @@ void MediaPlayerEngine::openMedia(const QString& filePath)
         return;
     }
 
+    m_playbackTimer->stop();
     setPlaybackState(PlaybackState::Opening);
+    resetFrameQueue();
+    emit workerPlaybackStateChanged(m_playbackState);
     emit openMediaRequested(filePath);
 }
 
 void MediaPlayerEngine::closeMedia()
 {
     m_hasOpenedMedia = false;
+    m_playbackTimer->stop();
     setPlaybackState(PlaybackState::Idle);
+    resetFrameQueue();
+    emit workerPlaybackStateChanged(m_playbackState);
     emit closeMediaRequested();
 }
 
 void MediaPlayerEngine::play()
 {
-    if (!m_hasOpenedMedia) {
+    if (!m_hasOpenedMedia || m_playbackState == PlaybackState::Playing) {
         return;
     }
 
-    emit playRequested();
+    setPlaybackState(PlaybackState::Playing);
+    emit workerPlaybackStateChanged(m_playbackState);
+    scheduleNextPlaybackTick();
 }
 
 void MediaPlayerEngine::pause()
 {
-    if (!m_hasOpenedMedia) {
+    if (!m_hasOpenedMedia || m_playbackState != PlaybackState::Playing) {
         return;
     }
 
-    emit pauseRequested();
+    m_playbackTimer->stop();
+    setPlaybackState(PlaybackState::Paused);
+    emit workerPlaybackStateChanged(m_playbackState);
 }
 
 void MediaPlayerEngine::stop()
@@ -117,8 +134,11 @@ void MediaPlayerEngine::stop()
         return;
     }
 
+    m_playbackTimer->stop();
+    resetFrameQueue();
     setPlaybackState(PlaybackState::Stopped);
-    emit stopRequested();
+    emit workerPlaybackStateChanged(m_playbackState);
+    emit seekRequested(0);
 }
 
 void MediaPlayerEngine::seek(qint64 positionMs)
@@ -127,15 +147,50 @@ void MediaPlayerEngine::seek(qint64 positionMs)
         return;
     }
 
+    m_playbackTimer->stop();
+    resetFrameQueue();
     emit seekRequested(positionMs);
+}
+
+void MediaPlayerEngine::handleDecodedFrame(const PlaybackFrame& frame)
+{
+    const bool wasEmpty = m_playbackFrameQueue.isEmpty();
+    m_playbackFrameQueue.enqueue(frame);
+    syncWorkerBufferedState();
+
+    if (m_playbackState == PlaybackState::Playing) {
+        if (!m_playbackTimer->isActive()) {
+            scheduleNextPlaybackTick();
+        }
+        return;
+    }
+
+    if (wasEmpty) {
+        m_lastRenderedPtsMs = frame.ptsMs;
+        emit firstFrameReady(frame.image);
+    }
+}
+
+void MediaPlayerEngine::handleEndOfStreamReached()
+{
+    m_endOfStreamPending = true;
+    if (m_playbackFrameQueue.isEmpty() &&
+        m_playbackState == PlaybackState::Playing) {
+        m_playbackTimer->stop();
+        setPlaybackState(PlaybackState::Stopped);
+        emit workerPlaybackStateChanged(m_playbackState);
+    }
 }
 
 void MediaPlayerEngine::handleMediaOpened(const QString& filePath)
 {
     m_hasOpenedMedia = true;
     m_currentMediaPath = filePath;
+    m_endOfStreamPending = false;
     setPlaybackState(PlaybackState::Ready);
     emit mediaOpened(filePath);
+    resetFrameQueue();
+    emit workerPlaybackStateChanged(m_playbackState);
     emit seekRequested(0);
 }
 
@@ -143,7 +198,10 @@ void MediaPlayerEngine::handleMediaOpenFailed(const QString& filePath,
                                               const QString& reason)
 {
     m_hasOpenedMedia = false;
+    m_playbackTimer->stop();
+    resetFrameQueue();
     setPlaybackState(PlaybackState::Error);
+    emit workerPlaybackStateChanged(m_playbackState);
     emit mediaOpenFailed(filePath, reason);
 }
 
@@ -152,20 +210,118 @@ void MediaPlayerEngine::handleCurrentMediaPathChanged(const QString& filePath)
     m_currentMediaPath = filePath;
     if (filePath.isEmpty()) {
         m_hasOpenedMedia = false;
+        m_playbackTimer->stop();
+        resetFrameQueue();
         setPlaybackState(PlaybackState::Idle);
+        emit workerPlaybackStateChanged(m_playbackState);
     }
 
     emit currentMediaPathChanged(filePath);
 }
 
-void MediaPlayerEngine::handlePlaybackPaused()
+void MediaPlayerEngine::handlePlaybackTick()
 {
-    setPlaybackState(PlaybackState::Paused);
+    if (m_playbackState != PlaybackState::Playing) {
+        m_playbackTimer->stop();
+        return;
+    }
+
+    if (m_playbackFrameQueue.isEmpty()) {
+        m_playbackTimer->stop();
+        if (m_endOfStreamPending) {
+            setPlaybackState(PlaybackState::Stopped);
+            emit workerPlaybackStateChanged(m_playbackState);
+        }
+        syncWorkerBufferedState();
+        return;
+    }
+
+    const PlaybackFrame frame = m_playbackFrameQueue.dequeue();
+    m_lastRenderedPtsMs = frame.ptsMs;
+    emit frameReady(frame.image);
+    syncWorkerBufferedState();
+    scheduleNextPlaybackTick();
 }
 
-void MediaPlayerEngine::handlePlaybackStarted()
+void MediaPlayerEngine::handlePlaybackIntervalChanged(int intervalMs)
 {
-    setPlaybackState(PlaybackState::Playing);
+    if (intervalMs <= 0) {
+        return;
+    }
+
+    m_playbackIntervalMs = intervalMs;
+    if (m_playbackTimer->isActive()) {
+        scheduleNextPlaybackTick();
+    }
+}
+
+void MediaPlayerEngine::handleSeekFailed(qint64 positionMs, const QString& reason)
+{
+    m_playbackTimer->stop();
+    setPlaybackState(PlaybackState::Paused);
+    emit workerPlaybackStateChanged(m_playbackState);
+
+    if (positionMs != 0 || m_currentMediaPath.isEmpty()) {
+        return;
+    }
+
+    m_hasOpenedMedia = false;
+    resetFrameQueue();
+    setPlaybackState(PlaybackState::Error);
+    emit mediaOpenFailed(m_currentMediaPath, reason);
+}
+
+qint64 MediaPlayerEngine::bufferedDurationMs() const
+{
+    qint64 durationMs = 0;
+    for (const PlaybackFrame& frame : m_playbackFrameQueue) {
+        durationMs += qMax<qint64>(1, frame.durationMs > 0 ? frame.durationMs
+                                                           : m_playbackIntervalMs);
+    }
+    return durationMs;
+}
+
+void MediaPlayerEngine::resetFrameQueue()
+{
+    m_playbackFrameQueue.clear();
+    m_endOfStreamPending = false;
+    m_lastRenderedPtsMs = -1;
+    syncWorkerBufferedState();
+}
+
+void MediaPlayerEngine::scheduleNextPlaybackTick()
+{
+    if (m_playbackState != PlaybackState::Playing) {
+        m_playbackTimer->stop();
+        return;
+    }
+
+    if (m_playbackFrameQueue.isEmpty()) {
+        m_playbackTimer->stop();
+        return;
+    }
+
+    const PlaybackFrame& nextFrame = m_playbackFrameQueue.head();
+    int intervalMs = m_playbackIntervalMs;
+    if (m_lastRenderedPtsMs >= 0) {
+        const qint64 ptsDeltaMs = nextFrame.ptsMs - m_lastRenderedPtsMs;
+        if (ptsDeltaMs > 0) {
+            intervalMs = static_cast<int>(ptsDeltaMs);
+        } else if (nextFrame.durationMs > 0) {
+            intervalMs = static_cast<int>(nextFrame.durationMs);
+        }
+    } else if (nextFrame.durationMs > 0) {
+        intervalMs = static_cast<int>(nextFrame.durationMs);
+    }
+
+    intervalMs = qMax(1, intervalMs);
+    m_playbackTimer->start(intervalMs);
+}
+
+void MediaPlayerEngine::syncWorkerBufferedState()
+{
+    emit workerBufferedStateChanged(bufferedDurationMs(),
+                                    m_playbackFrameQueue.size());
 }
 
 void MediaPlayerEngine::setPlaybackState(PlaybackState state)

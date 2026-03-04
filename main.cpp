@@ -1,11 +1,13 @@
 #include <QApplication>
 
+#include "service/player/playbackframe.h"
 #include "service/player/playbackstate.h"
 #include "view/mainwindow.h"
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
+    qRegisterMetaType<PlaybackFrame>("PlaybackFrame");
     qRegisterMetaType<PlaybackState>("PlaybackState");
 
     MainWindow w;

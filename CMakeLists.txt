@@ -38,6 +38,7 @@ qt_add_executable(MediaPlayer
     service/player/mediaplayerengine.cpp
     service/player/mediaplayerengine.h
     service/player/playbackstate.h
+    service/player/playbackframe.h
     view/logwidget.cpp
     view/logwidget.h
     view/logwidget.ui

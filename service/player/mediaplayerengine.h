@@ -3,9 +3,12 @@
 
 #include <QImage>
 #include <QObject>
+#include <QQueue>
 #include <QString>
 #include <QThread>
+#include <QTimer>
 
+#include "playbackframe.h"
 #include "playbackstate.h"
 
 class FFmpegDecoderWorker;
@@ -33,21 +36,23 @@ class MediaPlayerEngine : public QObject
     void seek(qint64 positionMs);
 
   private slots:
+    void handleDecodedFrame(const PlaybackFrame& frame);
+    void handleEndOfStreamReached();
     void handleMediaOpened(const QString& filePath);
     void handleMediaOpenFailed(const QString& filePath,
                                const QString& reason);
     void handleCurrentMediaPathChanged(const QString& filePath);
-    void handlePlaybackPaused();
-    void handlePlaybackStarted();
+    void handlePlaybackTick();
+    void handlePlaybackIntervalChanged(int intervalMs);
+    void handleSeekFailed(qint64 positionMs, const QString& reason);
 
   signals:
     void openMediaRequested(const QString& filePath);
     void closeMediaRequested();
-    void playRequested();
-    void pauseRequested();
-    void stopRequested();
     void seekRequested(qint64 positionMs);
-
+    void workerPlaybackStateChanged(PlaybackState state);
+    void workerBufferedStateChanged(qint64 bufferedDurationMs,
+                                    int bufferedFrameCount);
     void mediaOpenStarted(const QString& filePath);
     void mediaOpened(const QString& filePath);
     void mediaOpenFailed(const QString& filePath, const QString& reason);
@@ -57,14 +62,22 @@ class MediaPlayerEngine : public QObject
     void frameReady(const QImage& frame);
 
   private:
-    void setupWorker();
+    qint64 bufferedDurationMs() const;
+    void resetFrameQueue();
+    void scheduleNextPlaybackTick();
+    void syncWorkerBufferedState();
     void setPlaybackState(PlaybackState state);
 
     LogService* m_logService;
     QThread* m_decoderThread;
+    QTimer* m_playbackTimer;
     FFmpegDecoderWorker* m_decoderWorker;
+    QQueue<PlaybackFrame> m_playbackFrameQueue;
     QString m_currentMediaPath;
     bool m_hasOpenedMedia;
+    bool m_endOfStreamPending;
+    int m_playbackIntervalMs;
+    qint64 m_lastRenderedPtsMs;
     PlaybackState m_playbackState;
 };
 

@@ -9,6 +9,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
+#include <libavutil/frame.h>
 #include <libavutil/imgutils.h>
 }
 
@@ -275,16 +276,12 @@ DecodeFrameResult FFmpegMediaDecoder::decodeNextFrame(const QString& filePath)
                 return DecodeFrameResult::Error;
             }
 
-            if (m_logService != nullptr && m_currentMediaPath.isEmpty()) {
-                m_logService->append(
-                    tr("Decoded frame: width=%1 height=%2 format=%3 pts=%4")
-                        .arg(decodedFrame->width)
-                        .arg(decodedFrame->height)
-                        .arg(decodedFrame->format)
-                        .arg(decodedFrame->pts));
-            }
+            const qint64 ptsMs = framePositionMs(decodedFrame);
+            const qint64 durationMs = frameDurationMs(decodedFrame);
+            const bool isKeyFrame =
+                (decodedFrame->flags & AV_FRAME_FLAG_KEY) != 0;
 
-            emit frameDecoded(decodedFrame);
+            emit frameDecoded(decodedFrame, ptsMs, durationMs, isKeyFrame);
             av_frame_unref(m_frame);
             return DecodeFrameResult::FrameReady;
         }
@@ -293,6 +290,41 @@ DecodeFrameResult FFmpegMediaDecoder::decodeNextFrame(const QString& filePath)
             return DecodeFrameResult::EndOfStream;
         }
     }
+}
+
+qint64 FFmpegMediaDecoder::frameDurationMs(const AVFrame* frame) const
+{
+    if (frame == nullptr || m_formatContext == nullptr || m_videoStreamIndex < 0) {
+        return m_frameIntervalMs;
+    }
+
+    const AVRational timeBase =
+        m_formatContext->streams[m_videoStreamIndex]->time_base;
+    if (frame->duration > 0) {
+        return qMax<qint64>(
+            1, av_rescale_q(frame->duration, timeBase, AVRational{1, 1000}));
+    }
+
+    return m_frameIntervalMs;
+}
+
+qint64 FFmpegMediaDecoder::framePositionMs(const AVFrame* frame) const
+{
+    if (frame == nullptr || m_formatContext == nullptr || m_videoStreamIndex < 0) {
+        return 0;
+    }
+
+    const int64_t timestamp =
+        frame->best_effort_timestamp != AV_NOPTS_VALUE
+            ? frame->best_effort_timestamp
+            : frame->pts;
+    if (timestamp == AV_NOPTS_VALUE) {
+        return 0;
+    }
+
+    const AVRational timeBase =
+        m_formatContext->streams[m_videoStreamIndex]->time_base;
+    return av_rescale_q(timestamp, timeBase, AVRational{1, 1000});
 }
 
 bool FFmpegMediaDecoder::isSupportedVideoFile(const QString& filePath) const
