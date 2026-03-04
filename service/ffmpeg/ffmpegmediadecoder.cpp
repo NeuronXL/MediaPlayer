@@ -116,6 +116,7 @@ void FFmpegMediaDecoder::openMedia(const QString& filePath)
     }
 
     if (m_currentMediaPath == filePath) {
+        emit mediaInfoUpdated(m_mediaInfo);
         emit mediaOpened(filePath);
         return;
     }

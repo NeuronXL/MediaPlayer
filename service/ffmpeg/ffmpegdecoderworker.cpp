@@ -202,12 +202,11 @@ void FFmpegDecoderWorker::handleMediaOpenedInternal(const QString& filePath)
     m_stopRequested = false;
     m_seekPending = false;
     m_endOfStreamReached = false;
-    m_bufferingEnabled = true;
+    m_bufferingEnabled = false;
     resetBufferingState();
 
     emit playbackIntervalChanged(m_mediaDecoder->frameIntervalMs());
     emit mediaOpened(filePath);
-    scheduleBuffering();
 }
 
 void FFmpegDecoderWorker::handleMediaOpenFailedInternal(const QString& filePath,

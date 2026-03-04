@@ -103,11 +103,8 @@ void MediaPlayerEngine::openMedia(const QString& filePath)
     }
 
     m_playbackTimer->stop();
-    m_mediaInfo = {};
     setPlaybackState(PlaybackState::Opening);
     resetFrameQueue();
-    emit mediaInfoChanged(m_mediaInfo);
-    emit durationChanged(0);
     emit workerPlaybackStateChanged(m_playbackState);
     emit openMediaRequested(filePath);
 }
