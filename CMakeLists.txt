@@ -9,7 +9,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 # Qt
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia)
 
 # FFmpeg
 find_package(PkgConfig REQUIRED)
@@ -18,28 +18,41 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
     libavcodec
     libavutil
     libswscale
+    libswresample
 )
 
 qt_add_executable(MediaPlayer
     main.cpp
+	model/logentry.cpp
     model/logentry.h
     model/logmodel.cpp
     model/logmodel.h
-    service/ffmpeg/ffmpegframeconverter.cpp
-    service/ffmpeg/ffmpegframeconverter.h
-    service/ffmpeg/ffmpegdecoderworker.cpp
-    service/ffmpeg/ffmpegdecoderworker.h
-    service/ffmpeg/ffmpegmediadecoder.cpp
-    service/ffmpeg/ffmpegmediadecoder.h
-    service/ffmpeg/ffmpegutils.cpp
-    service/ffmpeg/ffmpegutils.h
+    service/adapter/qimagevideoadapter.cpp
+    service/adapter/qimagevideoadapter.h
+    service/adapter/qaudiooutputadapter.cpp
+    service/adapter/qaudiooutputadapter.h
+    service/adapter/iaudioadapter.cpp
+    service/adapter/ivideoadapter.h
+    service/adapter/ivideoadapter.cpp
     service/logging/logservice.cpp
     service/logging/logservice.h
+    service/pipeline/framequeue.h
+    service/pipeline/ffmpegdemuxer.cpp
+    service/pipeline/ffmpegdemuxer.h
+    service/pipeline/ffmpegaudiodecoder.cpp
+    service/pipeline/ffmpegaudiodecoder.h
+    service/pipeline/ffmpegvideodecoder.cpp
+    service/pipeline/ffmpegvideodecoder.h
+    service/pipeline/mediapipelineservice.cpp
+    service/pipeline/mediapipelineservice.h
+    service/pipeline/packetqueue.h
+    service/pipeline/workerconfig.h
     service/player/mediaplayerengine.cpp
     service/player/mediaplayerengine.h
-    service/player/mediainfo.h
-    service/player/playbackframe.h
-    service/player/playbackstate.h
+    service/player/mediaclock.cpp
+    service/player/mediaclock.h
+    service/adapter/iaudioadapter.h
+    service/player/playstate.h
     view/logwidget.cpp
     view/logwidget.h
     view/logwidget.ui
@@ -58,5 +71,6 @@ qt_add_executable(MediaPlayer
 
 target_link_libraries(MediaPlayer PRIVATE
     Qt6::Widgets
+    Qt6::Multimedia
     PkgConfig::FFMPEG
 )

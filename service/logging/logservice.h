@@ -1,27 +1,37 @@
 #ifndef LOGSERVICE_H
 #define LOGSERVICE_H
 
-#include <QObject>
-#include <QString>
+#include <cstdint>
+#include <functional>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 
+#include "../../model/logentry.h"
 class LogModel;
-struct LogEntry;
 
-class LogService : public QObject
-{
-    Q_OBJECT
+class LogService {
+public:
+    using SubscriptionId = std::uint64_t;
+    using LogCallback = std::function<void(const LogEntry&)>;
 
-  public:
-    explicit LogService(QObject* parent = nullptr);
-    ~LogService() override;
+    static LogService& instance();
 
-    LogModel* model() const;
+    LogService();
+    ~LogService();
 
-  public slots:
-    void append(const QString& message);
+    LogModel& model();
+
+    SubscriptionId subscribe(LogCallback callback);
+    void unsubscribe(SubscriptionId subscriptionId);
+
+    void append(const std::string& message);
     void append(const LogEntry& entry);
 
-  private:
+private:
+    std::mutex m_mutex;
+    SubscriptionId m_nextSubscriptionId;
+    std::unordered_map<SubscriptionId, LogCallback> m_callbacks;
     LogModel* m_logModel;
 };
 

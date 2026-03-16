@@ -5,33 +5,11 @@
 #include <QStringList>
 #include <QVBoxLayout>
 
-#include "../service/player/mediainfo.h"
 #include "logwidget.h"
 #include "playbackcontrolwidget.h"
 #include "videowidget.h"
 #include "ui_mainwindow.h"
 #include "../viewmodel/mainwindowviewmodel.h"
-
-namespace
-{
-QString mediaInfoSummary(const MediaInfo& mediaInfo)
-{
-    QStringList parts;
-    if (!mediaInfo.containerFormat.isEmpty()) {
-        parts << mediaInfo.containerFormat;
-    }
-    if (!mediaInfo.videoCodec.isEmpty()) {
-        parts << mediaInfo.videoCodec;
-    }
-    if (mediaInfo.width > 0 && mediaInfo.height > 0) {
-        parts << QStringLiteral("%1x%2").arg(mediaInfo.width).arg(mediaInfo.height);
-    }
-    if (mediaInfo.frameRate > 0.0) {
-        parts << QStringLiteral("%1 fps").arg(mediaInfo.frameRate, 0, 'f', 2);
-    }
-    return parts.join(QStringLiteral(" | "));
-}
-}
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -72,58 +50,29 @@ MainWindow::MainWindow(QWidget* parent)
 
     m_logWidget = new LogWidget(ui->debugPanelContainer);
     debugLayout->addWidget(m_logWidget);
-    m_logWidget->setLogModel(m_viewModel->logModel());
 
     m_debugPanelExpandedHeight = qMax(180, m_logWidget->sizeHint().height());
 
-    m_debugPanelAnimation =
-        new QPropertyAnimation(ui->debugPanelContainer, "maximumHeight", this);
+    m_debugPanelAnimation = new QPropertyAnimation(ui->debugPanelContainer, "maximumHeight", this);
     m_debugPanelAnimation->setDuration(220);
     m_debugPanelAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
-    connect(m_debugPanelAnimation, &QPropertyAnimation::valueChanged, this,
-            &MainWindow::handleDebugPanelAnimationValueChanged);
-
-    connect(m_debugPanelAnimation, &QPropertyAnimation::finished, this,
-            &MainWindow::handleDebugPanelAnimationFinished);
+    connect(m_debugPanelAnimation, &QPropertyAnimation::valueChanged, this, &MainWindow::handleDebugPanelAnimationValueChanged);
+    connect(m_debugPanelAnimation, &QPropertyAnimation::finished, this, &MainWindow::handleDebugPanelAnimationFinished);
 
     ui->actionDebug->setCheckable(true);
 
-    connect(ui->actionOpen, &QAction::triggered, m_viewModel,
-            &MainWindowViewModel::requestOpenFile);
-    connect(ui->actionDebug, &QAction::triggered, this,
-            &MainWindow::toggleDebugPanel);
-    connect(m_viewModel, &MainWindowViewModel::openFileRequested, this,
-            &MainWindow::openFileDialog);
-    connect(m_viewModel, &MainWindowViewModel::previewFrameChanged,
-            m_videoWidget, &VideoWidget::setFrame);
-    connect(m_viewModel, &MainWindowViewModel::mediaInfoChanged,
-            m_playbackControlWidget, &PlaybackControlWidget::setMediaInfo);
-    connect(m_viewModel, &MainWindowViewModel::currentPositionChanged,
-            m_playbackControlWidget, &PlaybackControlWidget::setCurrentPosition);
-    connect(m_viewModel, &MainWindowViewModel::mediaInfoChanged, this,
-            &MainWindow::handleMediaInfoChanged);
-    connect(m_viewModel, &MainWindowViewModel::playbackStateChanged,
-            m_playbackControlWidget, &PlaybackControlWidget::setPlaybackState);
-    connect(m_viewModel, &MainWindowViewModel::selectedFilePathChanged, this,
-            &MainWindow::updateSelectedFilePath);
-    connect(m_playbackControlWidget, &PlaybackControlWidget::playRequested,
-            m_viewModel,
-            &MainWindowViewModel::playPlayback);
-    connect(m_playbackControlWidget, &PlaybackControlWidget::pauseRequested,
-            m_viewModel,
-            &MainWindowViewModel::pausePlayback);
-    connect(m_playbackControlWidget, &PlaybackControlWidget::seekRequested,
-            m_viewModel, &MainWindowViewModel::seekPlayback);
-
-    m_playbackControlWidget->setPlaybackState(m_viewModel->playbackState());
-    m_playbackControlWidget->setMediaInfo(m_viewModel->mediaInfo());
-    m_playbackControlWidget->setCurrentPosition(m_viewModel->currentPositionMs());
+    connect(ui->actionOpen, &QAction::triggered, m_viewModel, &MainWindowViewModel::requestOpenFile);
+    connect(ui->actionDebug, &QAction::triggered, this, &MainWindow::toggleDebugPanel);
+    connect(m_viewModel, &MainWindowViewModel::openFileRequested, this, &MainWindow::openFileDialog);
+    connect(m_playbackControlWidget, &PlaybackControlWidget::playRequested, m_viewModel, &MainWindowViewModel::play);
+    connect(m_viewModel, &MainWindowViewModel::frameReady, m_videoWidget, &VideoWidget::setFrame);
+    connect(m_viewModel, &MainWindowViewModel::logEntryAdded, m_logWidget, &LogWidget::appendLog);
 }
 
 void MainWindow::handleMediaInfoChanged(const MediaInfo& mediaInfo)
 {
-    statusBar()->showMessage(mediaInfoSummary(mediaInfo));
+    
 }
 
 MainWindow::~MainWindow() { delete ui; }
@@ -187,6 +136,5 @@ void MainWindow::animateDebugPanel(bool expand)
 
 void MainWindow::updateSelectedFilePath(const QString& filePath)
 {
-    m_viewModel->appendLog(tr("Selected file: %1").arg(filePath));
     Q_UNUSED(filePath);
 }

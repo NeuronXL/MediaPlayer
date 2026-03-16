@@ -1,27 +1,21 @@
 #ifndef LOGMODEL_H
 #define LOGMODEL_H
 
-#include <QObject>
+#include <mutex>
 
 #include "logentry.h"
 
-class LogModel : public QObject
-{
-    Q_OBJECT
-
-  public:
-    explicit LogModel(QObject* parent = nullptr);
-    ~LogModel() override;
+class LogModel {
+public:
+    LogModel() = default;
+    ~LogModel() = default;
 
     LogEntries logs() const;
 
-  public slots:
     void appendLog(const LogEntry& logEntry);
 
-  signals:
-    void logAdded(const LogEntry& logEntry);
-
-  private:
+private:
+    mutable std::mutex m_mutex;
     LogEntries m_logs;
 };
 

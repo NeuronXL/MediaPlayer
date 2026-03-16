@@ -5,12 +5,12 @@
 #include <QObject>
 #include <QString>
 
-#include "../service/player/mediainfo.h"
-#include "../service/player/playbackstate.h"
+#include <cstdint>
+#include <memory>
 
-class LogModel;
-class LogService;
 class MediaPlayerEngine;
+class QImageVideoAdapter;
+class QAudioOutputAdapter;
 
 class MainWindowViewModel : public QObject
 {
@@ -20,44 +20,21 @@ class MainWindowViewModel : public QObject
     explicit MainWindowViewModel(QObject* parent = nullptr);
     ~MainWindowViewModel() override;
 
-    LogModel* logModel() const;
-    MediaInfo mediaInfo() const;
-    PlaybackState playbackState() const;
-    qint64 currentPositionMs() const;
-    QString selectedFilePath() const;
+  signals:
+    void frameReady(const QImage& frame);
+    void logEntryAdded(const QString& message);
+    void openFileRequested();
 
   public slots:
-    void appendLog(const QString& logMessage);
-    void pausePlayback();
-    void playPlayback();
+    void play();
     void requestOpenFile();
-    void seekPlayback(qint64 positionMs);
     void setSelectedFilePath(const QString& filePath);
 
-  private slots:
-    void handleCurrentMediaPathChanged(const QString& filePath);
-    void handleMediaOpened(const QString& filePath);
-    void handleMediaOpenFailed(const QString& filePath, const QString& reason);
-    void handleMediaInfoChanged(const MediaInfo& mediaInfo);
-    void handleMediaOpenStarted(const QString& filePath);
-    void handleCurrentPositionChanged(qint64 positionMs);
-    void handlePlaybackStateChanged(PlaybackState state);
-
-  signals:
-    void mediaInfoChanged(const MediaInfo& mediaInfo);
-    void openFileRequested();
-    void currentPositionChanged(qint64 positionMs);
-    void durationChanged(qint64 durationMs);
-    void playbackStateChanged(PlaybackState state);
-    void previewFrameChanged(const QImage& frame);
-    void selectedFilePathChanged(const QString& filePath);
-
   private:
-    LogService* m_logService;
     MediaPlayerEngine* m_mediaPlayerEngine;
-    MediaInfo m_mediaInfo;
-    qint64 m_currentPositionMs;
-    PlaybackState m_playbackState;
+    std::uint64_t m_logSubscriptionId;
+    std::shared_ptr<QImageVideoAdapter> m_videoAdapter;
+    std::shared_ptr<QAudioOutputAdapter> m_audioAdapter;
     QString m_selectedFilePath;
 };
 

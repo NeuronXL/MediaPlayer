@@ -1,23 +1,17 @@
 #include "logmodel.h"
 
-LogModel::LogModel(QObject* parent)
-    : QObject(parent)
-{
-}
-
-LogModel::~LogModel() = default;
-
 LogEntries LogModel::logs() const
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     return m_logs;
 }
 
 void LogModel::appendLog(const LogEntry& logEntry)
 {
-    if (logEntry.message.isEmpty()) {
+    if (logEntry.message.empty()) {
         return;
     }
 
-    m_logs.append(logEntry);
-    emit logAdded(logEntry);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_logs.push_back(logEntry);
 }

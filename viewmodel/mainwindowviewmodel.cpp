@@ -1,76 +1,51 @@
 #include "mainwindowviewmodel.h"
 
-#include "../model/logmodel.h"
+#include <QMetaObject>
+#include <QPointer>
+#include <memory>
+
+#include "../service/adapter/qimagevideoadapter.h"
+#include "../service/adapter/qaudiooutputadapter.h"
+#include "../model/logentry.h"
 #include "../service/logging/logservice.h"
 #include "../service/player/mediaplayerengine.h"
 
 MainWindowViewModel::MainWindowViewModel(QObject* parent)
     : QObject(parent)
-    , m_logService(new LogService(this))
-    , m_mediaPlayerEngine(new MediaPlayerEngine(m_logService, this))
-    , m_currentPositionMs(0)
-    , m_playbackState(PlaybackState::Idle)
+    , m_mediaPlayerEngine(nullptr)
+    , m_logSubscriptionId(0)
 {
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaOpenStarted, this,
-            &MainWindowViewModel::handleMediaOpenStarted);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaOpened, this,
-            &MainWindowViewModel::handleMediaOpened);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaOpenFailed, this,
-            &MainWindowViewModel::handleMediaOpenFailed);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::mediaInfoChanged, this,
-            &MainWindowViewModel::handleMediaInfoChanged);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::currentMediaPathChanged,
-            this, &MainWindowViewModel::handleCurrentMediaPathChanged);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::currentPositionChanged,
-            this, &MainWindowViewModel::handleCurrentPositionChanged);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::durationChanged, this,
-            &MainWindowViewModel::durationChanged);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::firstFrameReady, this,
-            &MainWindowViewModel::previewFrameChanged);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::frameReady, this,
-            &MainWindowViewModel::previewFrameChanged);
-    connect(m_mediaPlayerEngine, &MediaPlayerEngine::playbackStateChanged, this,
-            &MainWindowViewModel::handlePlaybackStateChanged);
+    m_videoAdapter = std::make_shared<QImageVideoAdapter>();
+    m_audioAdapter = std::make_shared<QAudioOutputAdapter>();
+    m_mediaPlayerEngine = new MediaPlayerEngine(m_videoAdapter, m_audioAdapter);
+
+    connect(m_videoAdapter.get(), &QImageVideoAdapter::frameAdapted, this, &MainWindowViewModel::frameReady);
+
+    QPointer<MainWindowViewModel> guard(this);
+    m_logSubscriptionId = LogService::instance().subscribe([guard](const LogEntry& entry) {
+        if (!guard) {
+            return;
+        }
+
+        const QString message = QString::fromStdString(formatLogEntry(entry));
+        QMetaObject::invokeMethod(guard, [guard, message]() {
+            if (guard) {
+                emit guard->logEntryAdded(message);
+            }
+        }, Qt::QueuedConnection);
+    });
 }
 
-MainWindowViewModel::~MainWindowViewModel() = default;
-
-LogModel* MainWindowViewModel::logModel() const
-{
-    return m_logService->model();
+MainWindowViewModel::~MainWindowViewModel() {
+    if (m_logSubscriptionId != 0) {
+        LogService::instance().unsubscribe(m_logSubscriptionId);
+        m_logSubscriptionId = 0;
+    }
+    delete m_mediaPlayerEngine;
+    m_mediaPlayerEngine = nullptr;
 }
 
-MediaInfo MainWindowViewModel::mediaInfo() const
-{
-    return m_mediaInfo;
-}
-
-PlaybackState MainWindowViewModel::playbackState() const
-{
-    return m_playbackState;
-}
-
-qint64 MainWindowViewModel::currentPositionMs() const
-{
-    return m_currentPositionMs;
-}
-
-QString MainWindowViewModel::selectedFilePath() const
-{
-    return m_selectedFilePath;
-}
-
-void MainWindowViewModel::appendLog(const QString& logMessage)
-{
-    m_logService->append(logMessage);
-}
-
-void MainWindowViewModel::pausePlayback()
-{
-    m_mediaPlayerEngine->pause();
-}
-
-void MainWindowViewModel::playPlayback()
+void MainWindowViewModel::play()
 {
     m_mediaPlayerEngine->play();
 }
@@ -80,73 +55,11 @@ void MainWindowViewModel::requestOpenFile()
     emit openFileRequested();
 }
 
-void MainWindowViewModel::seekPlayback(qint64 positionMs)
-{
-    m_mediaPlayerEngine->seek(positionMs);
-}
-
-void MainWindowViewModel::handleCurrentMediaPathChanged(const QString& filePath)
-{
-    if (m_selectedFilePath == filePath) {
-        return;
-    }
-
-    m_selectedFilePath = filePath;
-    emit selectedFilePathChanged(m_selectedFilePath);
-}
-
-void MainWindowViewModel::handleMediaOpened(const QString& filePath)
-{
-    if (m_selectedFilePath != filePath) {
-        m_selectedFilePath = filePath;
-        emit selectedFilePathChanged(m_selectedFilePath);
-    }
-
-    appendLog(tr("Media file loaded: %1").arg(filePath));
-}
-
-void MainWindowViewModel::handleMediaOpenFailed(const QString& filePath,
-                                                const QString& reason)
-{
-    appendLog(tr("Failed to load media file: %1 (%2)").arg(filePath, reason));
-}
-
-void MainWindowViewModel::handleMediaInfoChanged(const MediaInfo& mediaInfo)
-{
-    m_mediaInfo = mediaInfo;
-    emit mediaInfoChanged(m_mediaInfo);
-}
-
-void MainWindowViewModel::handleMediaOpenStarted(const QString& filePath)
-{
-    appendLog(tr("Opening media file: %1").arg(filePath));
-}
-
-void MainWindowViewModel::handleCurrentPositionChanged(qint64 positionMs)
-{
-    if (m_currentPositionMs == positionMs) {
-        return;
-    }
-
-    m_currentPositionMs = positionMs;
-    emit currentPositionChanged(m_currentPositionMs);
-}
-
-void MainWindowViewModel::handlePlaybackStateChanged(PlaybackState state)
-{
-    if (m_playbackState == state) {
-        return;
-    }
-
-    m_playbackState = state;
-    emit playbackStateChanged(m_playbackState);
-}
-
 void MainWindowViewModel::setSelectedFilePath(const QString& filePath)
 {
     if (filePath.isEmpty()) {
         return;
     }
 
-    m_mediaPlayerEngine->openMedia(filePath);
+    m_mediaPlayerEngine->openMedia(filePath.toStdString());
 }

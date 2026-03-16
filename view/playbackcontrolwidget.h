@@ -3,8 +3,7 @@
 
 #include <QWidget>
 
-#include "../service/player/mediainfo.h"
-#include "../service/player/playbackstate.h"
+#include "../service/player/playstate.h"
 
 namespace Ui
 {
@@ -20,8 +19,7 @@ class PlaybackControlWidget : public QWidget
     ~PlaybackControlWidget() override;
 
     void setCurrentPosition(qint64 positionMs);
-    void setMediaInfo(const MediaInfo& mediaInfo);
-    void setPlaybackState(PlaybackState state);
+    void setPlayState(PlayState state);
 
   signals:
     void playRequested();
@@ -43,7 +41,7 @@ class PlaybackControlWidget : public QWidget
     qint64 m_currentPositionMs;
     qint64 m_durationMs;
     bool m_isSeeking;
-    PlaybackState m_playbackState;
+    PlayState m_playbackState;
 };
 
 #endif // PLAYBACKCONTROLWIDGET_H

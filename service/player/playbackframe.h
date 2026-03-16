@@ -4,10 +4,11 @@
 #include <QImage>
 #include <QMetaType>
 
-struct PlaybackFrame
+#include "../common/timestampeditem.h"
+
+struct PlaybackFrame : public TimestampedItem
 {
     QImage image;
-    qint64 ptsMs = 0;
     qint64 durationMs = 0;
     bool isKeyFrame = false;
 };

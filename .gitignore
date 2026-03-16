@@ -23,3 +23,6 @@
 *.dylib
 *.dll
 *.exe
+
+# doc
+/doc/

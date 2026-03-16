@@ -1,12 +1,8 @@
 #ifndef LOGWIDGET_H
 #define LOGWIDGET_H
 
-#include <QMetaObject>
+#include <QString>
 #include <QWidget>
-
-#include "../model/logentry.h"
-
-class LogModel;
 
 namespace Ui
 {
@@ -21,17 +17,12 @@ class LogWidget : public QWidget
     explicit LogWidget(QWidget* parent = nullptr);
     ~LogWidget() override;
 
-    void setLogModel(LogModel* logModel);
-
   public slots:
-    void appendLog(const LogEntry& logEntry);
+    void appendLog(const QString& message);
+    void clearLogs();
 
   private:
-    void setLogs(const LogEntries& logs);
-
     Ui::LogWidget* ui;
-    LogModel* m_logModel;
-    QMetaObject::Connection m_logAddedConnection;
 };
 
 #endif // LOGWIDGET_H

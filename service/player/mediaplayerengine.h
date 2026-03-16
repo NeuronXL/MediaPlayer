@@ -1,92 +1,41 @@
 #ifndef MEDIAPLAYERENGINE_H
 #define MEDIAPLAYERENGINE_H
 
-#include <QImage>
-#include <QObject>
-#include <QQueue>
-#include <QString>
-#include <QThread>
-#include <QTimer>
+#include "../adapter/ivideoadapter.h"
+#include "../adapter/iaudioadapter.h"
+#include "mediaclock.h"
+#include "playstate.h"
 
-#include "playbackframe.h"
-#include "mediainfo.h"
-#include "playbackstate.h"
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <thread>
 
-class FFmpegDecoderWorker;
-class LogService;
+class MediaPipelineService;
 
-class MediaPlayerEngine : public QObject
-{
-    Q_OBJECT
+class MediaPlayerEngine {
+public:
+    explicit MediaPlayerEngine(std::shared_ptr<IVideoAdapter> videoAdapter,
+                               std::shared_ptr<IAudioAdapter> audioAdapter);
+    ~MediaPlayerEngine();
 
-  public:
-    explicit MediaPlayerEngine(LogService* logService,
-                               QObject* parent = nullptr);
-    ~MediaPlayerEngine() override;
-
-    QString currentMediaPath() const;
-    bool hasOpenedMedia() const;
-    MediaInfo mediaInfo() const;
-    PlaybackState playbackState() const;
-    qint64 currentPositionMs() const;
-
-  public slots:
-    void openMedia(const QString& filePath);
-    void closeMedia();
     void play();
     void pause();
-    void seek(qint64 positionMs);
+    void openMedia(std::string filePath);
 
-  private slots:
-    void handleDecodedFrame(const PlaybackFrame& frame);
-    void handleEndOfStreamReached();
-    void handleMediaOpened(const QString& filePath);
-    void handleMediaOpenFailed(const QString& filePath,
-                               const QString& reason);
-    void handleMediaInfoReady(const MediaInfo& mediaInfo);
-    void handleCurrentMediaPathChanged(const QString& filePath);
-    void handlePlaybackTick();
-    void handlePlaybackIntervalChanged(int intervalMs);
-    void handleSeekFailed(qint64 positionMs, const QString& reason);
+    void videoFeed();
+    void audioFeed();
 
-  signals:
-    void openMediaRequested(const QString& filePath);
-    void closeMediaRequested();
-    void seekRequested(qint64 positionMs);
-    void workerPlaybackStateChanged(PlaybackState state);
-    void workerBufferedStateChanged(qint64 bufferedDurationMs,
-                                    int bufferedFrameCount);
-    void mediaOpenStarted(const QString& filePath);
-    void mediaOpened(const QString& filePath);
-    void mediaOpenFailed(const QString& filePath, const QString& reason);
-    void mediaInfoChanged(const MediaInfo& mediaInfo);
-    void currentMediaPathChanged(const QString& filePath);
-    void currentPositionChanged(qint64 positionMs);
-    void durationChanged(qint64 durationMs);
-    void playbackStateChanged(PlaybackState state);
-    void firstFrameReady(const QImage& frame);
-    void frameReady(const QImage& frame);
-
-  private:
-    qint64 bufferedDurationMs() const;
-    void resetFrameQueue();
-    void scheduleNextPlaybackTick();
-    void syncWorkerBufferedState();
-    void setPlaybackState(PlaybackState state);
-
-    LogService* m_logService;
-    QThread* m_decoderThread;
-    QTimer* m_playbackTimer;
-    FFmpegDecoderWorker* m_decoderWorker;
-    QQueue<PlaybackFrame> m_playbackFrameQueue;
-    QString m_currentMediaPath;
-    MediaInfo m_mediaInfo;
-    bool m_hasOpenedMedia;
-    bool m_endOfStreamPending;
-    int m_playbackIntervalMs;
-    qint64 m_lastRenderedPtsMs;
-    qint64 m_currentPositionMs;
-    PlaybackState m_playbackState;
+private:
+    std::thread m_videoFeedThread;
+    std::thread m_audioFeedThread;
+    MediaPipelineService* m_pipelineService;
+    std::shared_ptr<IVideoAdapter> m_videoAdapter;
+    std::shared_ptr<IAudioAdapter> m_audioAdapter;
+    MediaClock m_clock;
+    PlayState m_playState;
+    std::string m_filePath;
+    int64_t m_curPts;
 };
 
 #endif // MEDIAPLAYERENGINE_H

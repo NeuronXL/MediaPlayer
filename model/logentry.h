@@ -1,28 +1,18 @@
 #ifndef LOGENTRY_H
 #define LOGENTRY_H
 
-#include <QDateTime>
-#include <QList>
-#include <QMetaType>
-#include <QString>
+#include <chrono>
+#include <string>
+#include <vector>
 
 struct LogEntry
 {
-    QDateTime timestamp;
-    QString message;
+    std::chrono::system_clock::time_point timestamp;
+    std::string message;
 };
 
-using LogEntries = QList<LogEntry>;
+using LogEntries = std::vector<LogEntry>;
 
-inline QString formatLogEntry(const LogEntry& entry)
-{
-    const QString timestampText = entry.timestamp.isValid()
-        ? entry.timestamp.toString("yyyy-MM-dd HH:mm:ss")
-        : QStringLiteral("0000-00-00 00:00:00");
-
-    return QString("[%1] %2").arg(timestampText, entry.message);
-}
-
-Q_DECLARE_METATYPE(LogEntry)
+std::string formatLogEntry(const LogEntry& entry);
 
 #endif // LOGENTRY_H

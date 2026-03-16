@@ -11,7 +11,7 @@ PlaybackControlWidget::PlaybackControlWidget(QWidget* parent)
     , m_currentPositionMs(0)
     , m_durationMs(0)
     , m_isSeeking(false)
-    , m_playbackState(PlaybackState::Idle)
+    , m_playbackState(PlayState::Idle)
 {
     ui->setupUi(this);
     setAttribute(Qt::WA_StyledBackground, true);
@@ -23,18 +23,13 @@ PlaybackControlWidget::PlaybackControlWidget(QWidget* parent)
 
     ui->playButton->setCheckable(false);
 
-    connect(ui->playButton, &QPushButton::clicked, this,
-            &PlaybackControlWidget::handlePlayButtonClicked);
-    connect(ui->progressSlider, &QSlider::sliderMoved, this,
-            &PlaybackControlWidget::handleProgressSliderMoved);
-    connect(ui->progressSlider, &QSlider::sliderPressed, this,
-            &PlaybackControlWidget::handleProgressSliderPressed);
-    connect(ui->progressSlider, &QSlider::sliderReleased, this,
-            &PlaybackControlWidget::handleProgressSliderReleased);
+    connect(ui->playButton, &QPushButton::clicked, this, &PlaybackControlWidget::handlePlayButtonClicked);
+    connect(ui->progressSlider, &QSlider::sliderMoved, this, &PlaybackControlWidget::handleProgressSliderMoved);
+    connect(ui->progressSlider, &QSlider::sliderPressed, this, &PlaybackControlWidget::handleProgressSliderPressed);
+    connect(ui->progressSlider, &QSlider::sliderReleased, this, &PlaybackControlWidget::handleProgressSliderReleased);
 
     updatePlayButtonAppearance();
     setCurrentPosition(0);
-    setMediaInfo(MediaInfo{});
 }
 
 PlaybackControlWidget::~PlaybackControlWidget()
@@ -52,21 +47,12 @@ void PlaybackControlWidget::setCurrentPosition(qint64 positionMs)
     ui->currentTimeLabel->setText(formatTime(m_currentPositionMs));
 
     const int sliderMaximum = qMax(1, ui->progressSlider->maximum());
-    const int sliderValue =
-        m_durationMs > 0
-            ? static_cast<int>((m_currentPositionMs * sliderMaximum) / m_durationMs)
-            : 0;
+    const int sliderValue = m_durationMs > 0 ? static_cast<int>((m_currentPositionMs * sliderMaximum) / m_durationMs) : 0;
     ui->progressSlider->setValue(qBound(0, sliderValue, sliderMaximum));
 }
 
-void PlaybackControlWidget::setMediaInfo(const MediaInfo& mediaInfo)
-{
-    m_durationMs = qMax<qint64>(0, mediaInfo.durationMs);
-    ui->durationLabel->setText(formatTime(m_durationMs));
-    setCurrentPosition(m_currentPositionMs);
-}
 
-void PlaybackControlWidget::setPlaybackState(PlaybackState state)
+void PlaybackControlWidget::setPlayState(PlayState state)
 {
     if (m_playbackState == state) {
         return;
@@ -78,7 +64,7 @@ void PlaybackControlWidget::setPlaybackState(PlaybackState state)
 
 void PlaybackControlWidget::handlePlayButtonClicked()
 {
-    if (m_playbackState == PlaybackState::Playing) {
+    if (m_playbackState == PlayState::Playing) {
         emit pauseRequested();
         return;
     }
@@ -100,8 +86,7 @@ void PlaybackControlWidget::handleProgressSliderPressed()
 
 void PlaybackControlWidget::handleProgressSliderReleased()
 {
-    const qint64 positionMs =
-        positionFromSliderValue(ui->progressSlider->value());
+    const qint64 positionMs = positionFromSliderValue(ui->progressSlider->value());
     m_currentPositionMs = positionMs;
     m_isSeeking = false;
     ui->currentTimeLabel->setText(formatTime(positionMs));
@@ -142,7 +127,7 @@ void PlaybackControlWidget::updatePlayButtonAppearance()
 {
     ui->playButton->setIcon(QIcon());
 
-    const bool isPlaying = (m_playbackState == PlaybackState::Playing);
+    const bool isPlaying = (m_playbackState == PlayState::Playing);
     ui->playButton->setText(isPlaying ? tr("Pause") : tr("Play"));
     ui->playButton->setToolTip(isPlaying ? tr("Pause") : tr("Play"));
     ui->playButton->setStatusTip(isPlaying ? tr("Pause") : tr("Play"));
