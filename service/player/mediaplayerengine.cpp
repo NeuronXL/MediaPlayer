@@ -11,8 +11,9 @@ MediaPlayerEngine::MediaPlayerEngine(std::shared_ptr<IVideoAdapter> videoAdapter
     : m_pipelineService(new MediaPipelineService())
     , m_videoAdapter(std::move(videoAdapter))
     , m_audioAdapter(std::move(audioAdapter))
+    , m_masterClockType(MasterClockType::Audio)
     , m_playState(PlayState::Paused)
-    , m_curPts(0) {
+    , m_curPts(0){
     m_videoFeedThread = std::thread(&MediaPlayerEngine::videoFeed, this);
     m_audioFeedThread = std::thread(&MediaPlayerEngine::audioFeed, this);
 }
@@ -36,83 +37,95 @@ MediaPlayerEngine::~MediaPlayerEngine() {
 
 void MediaPlayerEngine::play() {
     m_playState = PlayState::Playing;
-    m_audioAdapter->start();
+    if (m_audioAdapter) {
+        m_audioAdapter->start();
+    }
 }
 void MediaPlayerEngine::pause() {
-    m_curPts = m_clock.getCurrentTime();
 }
 
 void MediaPlayerEngine::openMedia(std::string filePath) {
     m_pipelineService->openMedia(filePath);
-    m_clock.setCurrentTime(0);
+    m_videoClock.setCurrentTime(0);
+    m_audioClock.setCurrentTime(0);
 }
 
 void MediaPlayerEngine::videoFeed() {
+    int64_t delay = 10;
     while (true) {
-        int64_t target = 10000;
         if (m_playState == PlayState::Paused) {
-            continue;
+            delay = 10;
         } else if (m_playState == PlayState::Playing) {
             FramePtr nextFrame = m_pipelineService->peekNextVideoFrame();
-            int64_t currentTime = m_clock.getCurrentTime();
-            if (nextFrame) {
-                if (nextFrame->pts <= currentTime) {
-                    if (nextFrame->pts + nextFrame->duration <= currentTime) {
-                        auto droppedFrame = m_pipelineService->popVideoFrame();
-                        (void)droppedFrame;
-                        continue;
-                    } else {
-                        // LogService::instance().append(
-                        //     "dispatch frame pts=" + std::to_string(nextFrame->pts) +
-                        //     " duration=" + std::to_string(nextFrame->duration) +
-                        //     " currentTime=" + std::to_string(currentTime));
-                        if (auto videoFrame = std::dynamic_pointer_cast<VideoFrame>(nextFrame)) {
-                            if (m_videoAdapter) {
-                                m_videoAdapter->onVideoFrame(videoFrame);
-                            }
-                        }
-                        target = (nextFrame->pts + nextFrame->duration - currentTime) > 0
-                            ? nextFrame->pts + nextFrame->duration - currentTime
-                            : 1000;
-                        auto displayedFrame = m_pipelineService->popVideoFrame();
-                        (void)displayedFrame;
-                    }
+            if (!nextFrame)
+                goto nextVideoLoop;
+
+            m_videoClock.setCurrentTime(nextFrame->pts);
+            if (auto videoFrame = std::dynamic_pointer_cast<VideoFrame>(nextFrame)) {
+                if (m_videoAdapter) {
+                    m_videoAdapter->onVideoFrame(videoFrame);
                 }
             }
+            delay = computeClockDelay(nextFrame->duration);
+            auto droppedFrame = m_pipelineService->popVideoFrame();
+            (void)droppedFrame;
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(target));
+nextVideoLoop:
+        std::this_thread::sleep_for(std::chrono::milliseconds(std::max(delay, 0ll)));
     }
 }
+
 void MediaPlayerEngine::audioFeed() {
+    int64_t delay = 100;
     while (true) {
-        int64_t target = 300000;
         if (m_playState == PlayState::Paused) {
             if (m_audioAdapter) {
                 m_audioAdapter->pause();
             }
-            m_curPts = m_clock.getCurrentTime();
         } else if (m_playState == PlayState::Playing) {
             if (m_audioAdapter) {
                 m_audioAdapter->start();
             }
-            int64_t time = m_audioAdapter->playedTimeUs();
-            m_clock.setCurrentTime(m_audioAdapter->playedTimeUs());
+            int64_t curTime = m_audioAdapter ? m_audioAdapter->playedTimeMs() : 0;
             FramePtr nextFrame = m_pipelineService->peekNextAudioFrame();
+            if (!nextFrame) {
+                delay = 5;
+                goto nextAudioLoop;
+            }
+            int64_t pcmLength = nextFrame->pts - curTime;
+            m_audioClock.setCurrentTime(curTime);
+            if (pcmLength + delay < 200) {
+                delay = 5;
+            } else {
+                delay = 100;
+            }
             if (nextFrame) {
-                if (auto audioFrame = std::dynamic_pointer_cast<AudioFrame>(nextFrame)) {
+                if (auto audioFrame =
+                        std::dynamic_pointer_cast<AudioFrame>(nextFrame)) {
                     if (m_audioAdapter) {
                         m_audioAdapter->write(audioFrame);
                     }
-                }
+                        }
                 auto consumedFrame = m_pipelineService->popAudioFrame();
                 (void)consumedFrame;
-            } else {
-                target = 10000;
             }
-            LogService::instance().append(
-                            "playedTimeUs=" + std::to_string(time) +
-                            "target=" + std::to_string(target));
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(target));
+nextAudioLoop:
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay));
     }
+}
+int64_t MediaPlayerEngine::computeClockDelay(int64_t delay) {
+    int64_t diff, syncThreshold = 0;
+    if (m_masterClockType == MasterClockType::Audio) {
+        diff = m_videoClock.getCurrentTime() - m_audioClock.getCurrentTime();
+        syncThreshold = std::max(1ll * 40, std::min(1ll * 100, delay));
+        if (diff <= -syncThreshold) {
+            delay = std::max(0ll, delay + diff);
+        } else if (diff >= syncThreshold && delay > 100ll) {
+            delay = delay + diff;
+        } else if (diff >= syncThreshold) {
+            delay = 2 * delay;
+        }
+    }
+    return delay;
 }

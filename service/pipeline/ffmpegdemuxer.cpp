@@ -117,9 +117,9 @@ void FFmpegDemuxer::open(const std::string& filePath) {
         config.timeBaseDen = videoStream->time_base.den > 0 ? videoStream->time_base.den : 1;
         if (videoStream->avg_frame_rate.num > 0 && videoStream->avg_frame_rate.den > 0) {
             const double fps = av_q2d(videoStream->avg_frame_rate);
-            config.frameIntervalUs = fps > 0.0 ? static_cast<int64_t>(1000000.0 / fps) : 33000;
+            config.frameIntervalMs = fps > 0.0 ? static_cast<int64_t>(1000.0 / fps) : 33;
         } else {
-            config.frameIntervalUs = 33000;
+            config.frameIntervalMs = 33;
         }
 
         try {
@@ -152,7 +152,7 @@ void FFmpegDemuxer::open(const std::string& filePath) {
                 audioConfig.codecParameters = audioCodecParameters;
                 audioConfig.timeBaseNum = audioStream->time_base.num;
                 audioConfig.timeBaseDen = audioStream->time_base.den > 0 ? audioStream->time_base.den : 1;
-                audioConfig.frameIntervalUs = 20000;
+                audioConfig.frameIntervalMs = 20;
 
                 try {
                     m_audioDecoder.configure(audioConfig);
@@ -223,7 +223,7 @@ void FFmpegDemuxer::runLoop() {
             packet->stream_index < static_cast<int>(m_formatContext->nb_streams)) {
             const AVStream* stream = m_formatContext->streams[packet->stream_index];
             if (stream != nullptr) {
-                mediaPacket->pts = av_rescale_q(timestamp, stream->time_base, AVRational{1, 1000000});
+                mediaPacket->pts = av_rescale_q(timestamp, stream->time_base, AVRational{1, 1000});
             }
         }
 

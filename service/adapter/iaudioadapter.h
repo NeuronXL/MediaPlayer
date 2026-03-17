@@ -20,7 +20,7 @@ public:
 
     virtual bool write(const std::shared_ptr<AudioFrame>& frame) = 0;
 
-    virtual int64_t playedTimeUs() const = 0;
+    virtual int64_t playedTimeMs() const = 0;
 
 protected:
     void releaseAudioContext();

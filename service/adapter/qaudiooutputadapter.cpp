@@ -114,11 +114,11 @@ bool QAudioOutputAdapter::write(const std::shared_ptr<AudioFrame>& frame) {
     return true;
 }
 
-int64_t QAudioOutputAdapter::playedTimeUs() const {
+int64_t QAudioOutputAdapter::playedTimeMs() const {
     if (m_audioSink == nullptr) {
         return 0;
     }
-    return m_audioSink->processedUSecs();
+    return m_audioSink->processedUSecs() / 1000;
 }
 
 bool QAudioOutputAdapter::ensureSink(const AudioFrame& frame) {

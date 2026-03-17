@@ -3,6 +3,7 @@
 
 #include "../adapter/ivideoadapter.h"
 #include "../adapter/iaudioadapter.h"
+#include "masterclocktype.h"
 #include "mediaclock.h"
 #include "playstate.h"
 
@@ -27,12 +28,17 @@ public:
     void audioFeed();
 
 private:
+    int64_t computeClockDelay(int64_t delay);
+
+private:
     std::thread m_videoFeedThread;
     std::thread m_audioFeedThread;
     MediaPipelineService* m_pipelineService;
     std::shared_ptr<IVideoAdapter> m_videoAdapter;
     std::shared_ptr<IAudioAdapter> m_audioAdapter;
-    MediaClock m_clock;
+    MasterClockType m_masterClockType;
+    MediaClock m_videoClock;
+    MediaClock m_audioClock;
     PlayState m_playState;
     std::string m_filePath;
     int64_t m_curPts;

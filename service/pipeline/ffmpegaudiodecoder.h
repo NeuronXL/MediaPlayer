@@ -31,7 +31,7 @@ class FFmpegAudioDecoder {
     AVFrame* m_frame;
     int m_timeBaseNum;
     int m_timeBaseDen;
-    int64_t m_frameIntervalUs;
+    int64_t m_frameIntervalMs;
 };
 
 #endif // FFMPEGAUDIODECODER_H

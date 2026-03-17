@@ -16,7 +16,7 @@ extern "C" {
 FFmpegVideoDecoder::FFmpegVideoDecoder(PacketQueue* videoPacketQueue, FrameQueue* videoFrameQueue)
     : m_videoPacketQueue(videoPacketQueue), m_videoFrameQueue(videoFrameQueue),
       m_codecContext(nullptr), m_frame(nullptr), m_timeBaseNum(1), m_timeBaseDen(1000),
-      m_frameIntervalUs(33000) {}
+      m_frameIntervalMs(33) {}
 
 FFmpegVideoDecoder::~FFmpegVideoDecoder() {
     shutDwon();
@@ -63,7 +63,7 @@ void FFmpegVideoDecoder::configure(const VideoDecoderConfig& config) {
 
     m_timeBaseNum = config.timeBaseNum > 0 ? config.timeBaseNum : 1;
     m_timeBaseDen = config.timeBaseDen > 0 ? config.timeBaseDen : 1000;
-    m_frameIntervalUs = config.frameIntervalUs > 0 ? config.frameIntervalUs : 33000;
+    m_frameIntervalMs = config.frameIntervalMs > 0 ? config.frameIntervalMs : 33;
 
     m_workThread = std::thread(&FFmpegVideoDecoder::runLoop, this);
 }
@@ -116,13 +116,13 @@ void FFmpegVideoDecoder::runLoop() {
                 decodedFrame->format = m_frame->format;
                 decodedFrame->sar = m_frame->sample_aspect_ratio;
                 const AVRational sourceTimeBase{m_timeBaseNum, m_timeBaseDen};
-                const AVRational usTimeBase{1, 1000000};
+                const AVRational msTimeBase{1, 1000};
                 decodedFrame->pts = m_frame->best_effort_timestamp != AV_NOPTS_VALUE
-                    ? av_rescale_q(m_frame->best_effort_timestamp, sourceTimeBase, usTimeBase)
+                    ? av_rescale_q(m_frame->best_effort_timestamp, sourceTimeBase, msTimeBase)
                     : -1;
                 decodedFrame->duration = m_frame->duration > 0
-                    ? av_rescale_q(m_frame->duration, sourceTimeBase, usTimeBase)
-                    : m_frameIntervalUs;
+                    ? av_rescale_q(m_frame->duration, sourceTimeBase, msTimeBase)
+                    : m_frameIntervalMs;
                 decodedFrame->pos = m_frame->pkt_dts;
 
                 if (!m_videoFrameQueue->push(decodedFrame)) {

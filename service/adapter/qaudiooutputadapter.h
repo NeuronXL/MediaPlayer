@@ -17,7 +17,7 @@ public:
     void stop() override;
     void reset() override;
     bool write(const std::shared_ptr<AudioFrame>& frame) override;
-    int64_t playedTimeUs() const override;
+    int64_t playedTimeMs() const override;
 
 private:
     bool ensureSink(const AudioFrame& frame);
