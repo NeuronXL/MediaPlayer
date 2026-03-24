@@ -22,7 +22,7 @@ FFmpegVideoDecoder::~FFmpegVideoDecoder() {
     shutDwon();
 }
 
-void FFmpegVideoDecoder::configure(const VideoDecoderConfig& config) {
+void FFmpegVideoDecoder:: configure(const VideoDecoderConfig& config) {
     shutDwon();
 
     if (config.codecParameters == nullptr) {

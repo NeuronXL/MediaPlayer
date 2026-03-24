@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "../service/player/mediainfo.h"
+
 class MediaPlayerEngine;
 class QImageVideoAdapter;
 class QAudioOutputAdapter;
@@ -21,7 +23,8 @@ class MainWindowViewModel : public QObject
     ~MainWindowViewModel() override;
 
   signals:
-    void frameReady(const QImage& frame);
+    void frameReady(const QImage& frame, qint64 playbackTimeMs);
+    void mediaInfoChanged(const MediaInfo& mediaInfo);
     void logEntryAdded(const QString& message);
     void openFileRequested();
 
@@ -32,6 +35,7 @@ class MainWindowViewModel : public QObject
 
   private:
     MediaPlayerEngine* m_mediaPlayerEngine;
+    std::uint64_t m_engineSubscriptionId;
     std::uint64_t m_logSubscriptionId;
     std::shared_ptr<QImageVideoAdapter> m_videoAdapter;
     std::shared_ptr<QAudioOutputAdapter> m_audioAdapter;

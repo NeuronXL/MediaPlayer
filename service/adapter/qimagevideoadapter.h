@@ -15,7 +15,7 @@ public:
     void onVideoFrame(const std::shared_ptr<VideoFrame>& frame) override;
 
 signals:
-    void frameAdapted(const QImage& frame);
+    void frameAdapted(const QImage& frame, qint64 playbackTimeMs);
 
 private:
     QImage adapt(const VideoFrame& frame);

@@ -3,22 +3,34 @@
 
 #include "../adapter/ivideoadapter.h"
 #include "../adapter/iaudioadapter.h"
+#include "engineevent.h"
 #include "masterclocktype.h"
 #include "mediaclock.h"
 #include "playstate.h"
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 class MediaPipelineService;
 
 class MediaPlayerEngine {
 public:
+    using SubscriptionId = std::uint64_t;
+    using EventHandler = std::function<void(const EngineEvent&)>;
+    using EventExecutor = std::function<void(std::function<void()>)>;
+
     explicit MediaPlayerEngine(std::shared_ptr<IVideoAdapter> videoAdapter,
                                std::shared_ptr<IAudioAdapter> audioAdapter);
     ~MediaPlayerEngine();
+
+    SubscriptionId subscribe(EngineEventMask eventMask, EventHandler handler, EventExecutor executor = {});
+    void unsubscribe(SubscriptionId subscriptionId);
 
     void play();
     void pause();
@@ -29,13 +41,23 @@ public:
 
 private:
     int64_t computeClockDelay(int64_t delay);
+    void publishEvent(const EngineEvent& event);
 
 private:
+    struct Subscriber {
+        SubscriptionId id{0};
+        EngineEventMask eventMask{0};
+        EventHandler handler;
+        EventExecutor executor;
+    };
+
     std::thread m_videoFeedThread;
     std::thread m_audioFeedThread;
     MediaPipelineService* m_pipelineService;
-    std::shared_ptr<IVideoAdapter> m_videoAdapter;
     std::shared_ptr<IAudioAdapter> m_audioAdapter;
+    std::atomic<SubscriptionId> m_nextSubscriptionId;
+    std::mutex m_subscriberMutex;
+    std::vector<Subscriber> m_subscribers;
     MasterClockType m_masterClockType;
     MediaClock m_videoClock;
     MediaClock m_audioClock;

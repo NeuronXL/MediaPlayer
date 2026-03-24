@@ -13,6 +13,7 @@
 MainWindowViewModel::MainWindowViewModel(QObject* parent)
     : QObject(parent)
     , m_mediaPlayerEngine(nullptr)
+    , m_engineSubscriptionId(0)
     , m_logSubscriptionId(0)
 {
     m_videoAdapter = std::make_shared<QImageVideoAdapter>();
@@ -20,6 +21,45 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
     m_mediaPlayerEngine = new MediaPlayerEngine(m_videoAdapter, m_audioAdapter);
 
     connect(m_videoAdapter.get(), &QImageVideoAdapter::frameAdapted, this, &MainWindowViewModel::frameReady);
+
+    QPointer<MainWindowViewModel> eventGuard(this);
+    m_engineSubscriptionId = m_mediaPlayerEngine->subscribe(
+        ENGINE_EVENT_VIDEO_FRAME | ENGINE_EVENT_OPEN_MEDIA_SUCCEEDED | ENGINE_EVENT_OPEN_MEDIA_FAILED,
+        [eventGuard](const EngineEvent& event) {
+            if (!eventGuard) {
+                return;
+            }
+            QMetaObject::invokeMethod(eventGuard, [eventGuard, event]() {
+                if (!eventGuard) {
+                    return;
+                }
+
+                if (const auto* videoEvent = std::get_if<VideoFrameEvent>(&event)) {
+                    if (eventGuard->m_videoAdapter && videoEvent->frame) {
+                        eventGuard->m_videoAdapter->onVideoFrame(videoEvent->frame);
+                    }
+                    return;
+                }
+
+                if (const auto* openEvent = std::get_if<OpenMediaSucceededEvent>(&event)) {
+                    MediaInfo mediaInfo;
+                    mediaInfo.filePath = QString::fromStdString(openEvent->mediaInfo.filePath);
+                    mediaInfo.containerFormat = QString::fromStdString(openEvent->mediaInfo.containerFormat);
+                    mediaInfo.videoCodec = QString::fromStdString(openEvent->mediaInfo.videoCodec);
+                    mediaInfo.durationMs = openEvent->mediaInfo.durationMs;
+                    mediaInfo.width = openEvent->mediaInfo.width;
+                    mediaInfo.height = openEvent->mediaInfo.height;
+                    mediaInfo.frameRate = openEvent->mediaInfo.frameRate;
+                    emit eventGuard->mediaInfoChanged(mediaInfo);
+                    return;
+                }
+
+                if (const auto* failedEvent = std::get_if<OpenMediaFailedEvent>(&event)) {
+                    emit eventGuard->logEntryAdded(QString::fromStdString(
+                        "open media failed: " + failedEvent->filePath + " reason=" + failedEvent->errorMessage));
+                }
+            }, Qt::QueuedConnection);
+        });
 
     QPointer<MainWindowViewModel> guard(this);
     m_logSubscriptionId = LogService::instance().subscribe([guard](const LogEntry& entry) {
@@ -37,6 +77,10 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
 }
 
 MainWindowViewModel::~MainWindowViewModel() {
+    if (m_engineSubscriptionId != 0) {
+        m_mediaPlayerEngine->unsubscribe(m_engineSubscriptionId);
+        m_engineSubscriptionId = 0;
+    }
     if (m_logSubscriptionId != 0) {
         LogService::instance().unsubscribe(m_logSubscriptionId);
         m_logSubscriptionId = 0;

@@ -4,6 +4,7 @@
 #include "packetqueue.h"
 #include "ffmpegaudiodecoder.h"
 #include "ffmpegvideodecoder.h"
+#include "mediasourceinfo.h"
 
 #include <cstdint>
 #include <string>
@@ -20,7 +21,7 @@ class FFmpegDemuxer {
                            FrameQueue* audioFrameQueue);
     ~FFmpegDemuxer();
 
-    void open(const std::string& filePath);
+    bool open(const std::string& filePath, MediaSourceInfo* sourceInfo, std::string* errorMessage);
     void seek(int64_t positionMs);
 
     private:

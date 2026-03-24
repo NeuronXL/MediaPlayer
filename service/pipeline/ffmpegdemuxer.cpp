@@ -9,6 +9,7 @@
 #include "../logging/logservice.h"
 
 extern "C" {
+#include <libavcodec/avcodec.h>
 #include <libavcodec/codec_par.h>
 #include <libavcodec/codec_desc.h>
 #include <libavformat/avformat.h>
@@ -27,9 +28,15 @@ FFmpegDemuxer::FFmpegDemuxer(PacketQueue* videoPacketQueue, PacketQueue* audioPa
 
 FFmpegDemuxer::~FFmpegDemuxer() {}
 
-void FFmpegDemuxer::open(const std::string& filePath) {
+bool FFmpegDemuxer::open(const std::string& filePath, MediaSourceInfo* sourceInfo, std::string* errorMessage) {
     namespace fs = std::filesystem;
     const fs::path fsPath(filePath);
+    if (sourceInfo != nullptr) {
+        *sourceInfo = MediaSourceInfo{};
+    }
+    if (errorMessage != nullptr) {
+        errorMessage->clear();
+    }
 
     try {
         if (filePath.empty()) {
@@ -121,6 +128,22 @@ void FFmpegDemuxer::open(const std::string& filePath) {
         } else {
             config.frameIntervalMs = 33;
         }
+        if (sourceInfo != nullptr) {
+            sourceInfo->filePath = filePath;
+            sourceInfo->containerFormat =
+                (m_formatContext != nullptr && m_formatContext->iformat != nullptr && m_formatContext->iformat->name != nullptr)
+                    ? m_formatContext->iformat->name
+                    : "";
+            sourceInfo->videoCodec = videoStream->codecpar != nullptr ? avcodec_get_name(videoStream->codecpar->codec_id) : "";
+            sourceInfo->durationMs = (m_formatContext != nullptr && m_formatContext->duration > 0)
+                ? (m_formatContext->duration / (AV_TIME_BASE / 1000))
+                : 0;
+            sourceInfo->width = videoStream->codecpar != nullptr ? videoStream->codecpar->width : 0;
+            sourceInfo->height = videoStream->codecpar != nullptr ? videoStream->codecpar->height : 0;
+            sourceInfo->frameRate = (videoStream->avg_frame_rate.num > 0 && videoStream->avg_frame_rate.den > 0)
+                ? av_q2d(videoStream->avg_frame_rate)
+                : 0.0;
+        }
 
         try {
             m_videoDecoder.configure(config);
@@ -128,7 +151,10 @@ void FFmpegDemuxer::open(const std::string& filePath) {
         } catch (const std::exception&) {
             avcodec_parameters_free(&config.codecParameters);
             resetDemuxSession();
-            return;
+            if (errorMessage != nullptr) {
+                *errorMessage = "video decoder configure failed";
+            }
+            return false;
         }
 
         if (m_audioStreamIndex >= 0 &&
@@ -138,14 +164,20 @@ void FFmpegDemuxer::open(const std::string& filePath) {
                 AVCodecParameters* audioCodecParameters = avcodec_parameters_alloc();
                 if (audioCodecParameters == nullptr) {
                     resetDemuxSession();
-                    return;
+                    if (errorMessage != nullptr) {
+                        *errorMessage = "failed to allocate audio codec parameters";
+                    }
+                    return false;
                 }
 
                 ret = avcodec_parameters_copy(audioCodecParameters, audioStream->codecpar);
                 if (ret < 0) {
                     avcodec_parameters_free(&audioCodecParameters);
                     resetDemuxSession();
-                    return;
+                    if (errorMessage != nullptr) {
+                        *errorMessage = "failed to copy audio codec parameters";
+                    }
+                    return false;
                 }
 
                 AudioDecoderConfig audioConfig;
@@ -160,16 +192,27 @@ void FFmpegDemuxer::open(const std::string& filePath) {
                 } catch (const std::exception&) {
                     avcodec_parameters_free(&audioConfig.codecParameters);
                     resetDemuxSession();
-                    return;
+                    if (errorMessage != nullptr) {
+                        *errorMessage = "audio decoder configure failed";
+                    }
+                    return false;
                 }
             }
         }
         m_workThread = std::thread(&FFmpegDemuxer::runLoop, this);
+        return true;
     } catch (const std::exception& ex) {
         resetDemuxSession();
-        (void)ex;
+        if (errorMessage != nullptr) {
+            *errorMessage = ex.what();
+        }
+        return false;
     } catch (...) {
         resetDemuxSession();
+        if (errorMessage != nullptr) {
+            *errorMessage = "unknown error";
+        }
+        return false;
     }
 }
 

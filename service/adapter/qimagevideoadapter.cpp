@@ -12,7 +12,7 @@ void QImageVideoAdapter::onVideoFrame(const std::shared_ptr<VideoFrame>& frame) 
     if (!frame) {
         return;
     }
-    emit frameAdapted(adapt(*frame));
+    emit frameAdapted(adapt(*frame), frame->pts);
 }
 
 QImage QImageVideoAdapter::adapt(const VideoFrame& frame) {

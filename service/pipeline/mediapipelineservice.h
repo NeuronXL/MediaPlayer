@@ -5,6 +5,7 @@
 #include <string>
 
 #include "framequeue.h"
+#include "mediasourceinfo.h"
 #include "packetqueue.h"
 
 class FFmpegDemuxer;
@@ -16,7 +17,7 @@ class MediaPipelineService {
     ~MediaPipelineService();
 
     void closeMedia();
-    void openMedia(std::string& filePath);
+    bool openMedia(std::string& filePath, MediaSourceInfo* sourceInfo, std::string* errorMessage);
     void seek(int64_t positionMs);
 
     FramePtr peekLastVideoFrame();

@@ -19,6 +19,7 @@ class PlaybackControlWidget : public QWidget
     ~PlaybackControlWidget() override;
 
     void setCurrentPosition(qint64 positionMs);
+    void setDuration(qint64 durationMs);
     void setPlayState(PlayState state);
 
   signals:

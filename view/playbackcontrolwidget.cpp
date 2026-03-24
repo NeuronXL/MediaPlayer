@@ -29,6 +29,7 @@ PlaybackControlWidget::PlaybackControlWidget(QWidget* parent)
     connect(ui->progressSlider, &QSlider::sliderReleased, this, &PlaybackControlWidget::handleProgressSliderReleased);
 
     updatePlayButtonAppearance();
+    setDuration(0);
     setCurrentPosition(0);
 }
 
@@ -51,6 +52,20 @@ void PlaybackControlWidget::setCurrentPosition(qint64 positionMs)
     ui->progressSlider->setValue(qBound(0, sliderValue, sliderMaximum));
 }
 
+void PlaybackControlWidget::setDuration(qint64 durationMs)
+{
+    m_durationMs = qMax<qint64>(0, durationMs);
+    ui->durationLabel->setText(formatTime(m_durationMs));
+
+    if (m_durationMs == 0) {
+        ui->progressSlider->setValue(0);
+        return;
+    }
+
+    const int sliderMaximum = qMax(1, ui->progressSlider->maximum());
+    const int sliderValue = static_cast<int>((m_currentPositionMs * sliderMaximum) / m_durationMs);
+    ui->progressSlider->setValue(qBound(0, sliderValue, sliderMaximum));
+}
 
 void PlaybackControlWidget::setPlayState(PlayState state)
 {

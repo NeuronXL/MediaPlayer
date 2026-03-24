@@ -9,6 +9,7 @@
 #include "playbackcontrolwidget.h"
 #include "videowidget.h"
 #include "ui_mainwindow.h"
+#include "../service/player/mediainfo.h"
 #include "../viewmodel/mainwindowviewmodel.h"
 
 MainWindow::MainWindow(QWidget* parent)
@@ -66,13 +67,18 @@ MainWindow::MainWindow(QWidget* parent)
     connect(ui->actionDebug, &QAction::triggered, this, &MainWindow::toggleDebugPanel);
     connect(m_viewModel, &MainWindowViewModel::openFileRequested, this, &MainWindow::openFileDialog);
     connect(m_playbackControlWidget, &PlaybackControlWidget::playRequested, m_viewModel, &MainWindowViewModel::play);
-    connect(m_viewModel, &MainWindowViewModel::frameReady, m_videoWidget, &VideoWidget::setFrame);
+    connect(m_viewModel, &MainWindowViewModel::frameReady, this, [this](const QImage& frame, qint64 playbackTimeMs) {
+        m_videoWidget->setFrame(frame);
+        m_playbackControlWidget->setCurrentPosition(playbackTimeMs);
+    });
+    connect(m_viewModel, &MainWindowViewModel::mediaInfoChanged, this, &MainWindow::handleMediaInfoChanged);
     connect(m_viewModel, &MainWindowViewModel::logEntryAdded, m_logWidget, &LogWidget::appendLog);
 }
 
 void MainWindow::handleMediaInfoChanged(const MediaInfo& mediaInfo)
 {
-    
+    m_playbackControlWidget->setDuration(mediaInfo.durationMs);
+    m_playbackControlWidget->setCurrentPosition(0);
 }
 
 MainWindow::~MainWindow() { delete ui; }

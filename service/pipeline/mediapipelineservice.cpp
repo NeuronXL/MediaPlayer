@@ -22,9 +22,12 @@ MediaPipelineService::~MediaPipelineService() {
     m_videoDecoder = nullptr;
 }
 
-void MediaPipelineService::openMedia(std::string& filePath) {
+bool MediaPipelineService::openMedia(std::string& filePath, MediaSourceInfo* sourceInfo, std::string* errorMessage) {
     if (filePath.empty()) {
-        return;
+        if (errorMessage != nullptr) {
+            *errorMessage = "file path is empty";
+        }
+        return false;
     }
 
     closeMedia();
@@ -35,8 +38,12 @@ void MediaPipelineService::openMedia(std::string& filePath) {
     m_audioFrameQueue.init();
 
     if (m_demuxer != nullptr) {
-        m_demuxer->open(filePath);
+        return m_demuxer->open(filePath, sourceInfo, errorMessage);
     }
+    if (errorMessage != nullptr) {
+        *errorMessage = "demuxer is null";
+    }
+    return false;
 }
 
 void MediaPipelineService::closeMedia() {
