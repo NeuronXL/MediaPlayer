@@ -32,6 +32,9 @@ class FFmpegAudioDecoder {
     int m_timeBaseNum;
     int m_timeBaseDen;
     int64_t m_frameIntervalMs;
+    int m_outputSampleRate;
+    int m_outputChannels;
+    int m_outputSampleFormat;
 };
 
 #endif // FFMPEGAUDIODECODER_H

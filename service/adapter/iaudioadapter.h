@@ -7,6 +7,13 @@
 #include <memory>
 
 struct SwrContext;
+class IAudioFrameSource;
+
+struct AudioOutputSpec {
+    int sampleRate = 0;
+    int channels = 0;
+    int sampleFormat = -1;
+};
 
 class IAudioAdapter {
 public:
@@ -17,10 +24,8 @@ public:
     virtual void pause() = 0;
     virtual void stop() = 0;
     virtual void reset() = 0;
-
-    virtual bool write(const std::shared_ptr<AudioFrame>& frame) = 0;
-
-    virtual int64_t playedTimeMs() const = 0;
+    virtual void setAudioFrameSource(IAudioFrameSource* source) = 0;
+    virtual AudioOutputSpec outputSpec() const = 0;
 
 protected:
     void releaseAudioContext();

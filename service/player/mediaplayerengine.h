@@ -3,6 +3,7 @@
 
 #include "../adapter/ivideoadapter.h"
 #include "../adapter/iaudioadapter.h"
+#include "iaudioframesource.h"
 #include "engineevent.h"
 #include "masterclocktype.h"
 #include "mediaclock.h"
@@ -13,13 +14,14 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <cstddef>
 #include <string>
 #include <thread>
 #include <vector>
 
 class MediaPipelineService;
 
-class MediaPlayerEngine {
+class MediaPlayerEngine : public IAudioFrameSource {
 public:
     using SubscriptionId = std::uint64_t;
     using EventHandler = std::function<void(const EngineEvent&)>;
@@ -37,7 +39,7 @@ public:
     void openMedia(std::string filePath);
 
     void videoFeed();
-    void audioFeed();
+    int readPcm(std::uint8_t* destination, int maxBytes) override;
 
 private:
     int64_t computeClockDelay(int64_t delay);
@@ -52,9 +54,10 @@ private:
     };
 
     std::thread m_videoFeedThread;
-    std::thread m_audioFeedThread;
     MediaPipelineService* m_pipelineService;
     std::shared_ptr<IAudioAdapter> m_audioAdapter;
+    std::shared_ptr<AudioFrame> m_activeAudioFrame;
+    std::size_t m_activeAudioOffset;
     std::atomic<SubscriptionId> m_nextSubscriptionId;
     std::mutex m_subscriberMutex;
     std::vector<Subscriber> m_subscribers;

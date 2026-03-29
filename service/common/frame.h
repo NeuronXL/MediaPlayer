@@ -1,6 +1,7 @@
 #ifndef FRAME_H
 #define FRAME_H
 #include <stdint.h>
+#include <vector>
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -49,25 +50,23 @@ class VideoFrame : public Frame {
 class AudioFrame : public Frame {
     public:
     AudioFrame() {
-        frame = nullptr;
         sampleRate = 0;
         channels = 0;
         format = -1;
         nbSamples = 0;
+        bytesPerSample = 0;
+        interleaved = true;
     }
-    ~AudioFrame() {
-        if (frame) {
-            av_frame_free(&frame);
-            frame = nullptr;
-        }
-    }
+    ~AudioFrame() {}
 
     public:
-    AVFrame* frame;
     int sampleRate;
     int channels;
     int format;
     int nbSamples;
+    int bytesPerSample;
+    bool interleaved;
+    std::vector<uint8_t> pcmData;
 };
 
 #endif // FRAME_H

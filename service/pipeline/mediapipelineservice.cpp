@@ -59,6 +59,13 @@ void MediaPipelineService::seek(int64_t positionMs) {
         m_demuxer->seek(positionMs);
     }
 }
+
+void MediaPipelineService::setAudioOutputFormat(int sampleRate, int channels, int sampleFormat) {
+    if (m_demuxer != nullptr) {
+        m_demuxer->setAudioOutputFormat(sampleRate, channels, sampleFormat);
+    }
+}
+
 FramePtr MediaPipelineService::peekLastVideoFrame() {
     return m_videoFrameQueue.peekLast();
 }

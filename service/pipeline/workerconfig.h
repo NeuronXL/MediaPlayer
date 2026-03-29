@@ -19,6 +19,9 @@ struct AudioDecoderConfig
     int timeBaseNum = 0;
     int timeBaseDen = 1;
     int64_t frameIntervalMs = 20;
+    int outputSampleRate = 0;
+    int outputChannels = 0;
+    int outputSampleFormat = -1;
 };
 
 #endif // WORKERCONFIG_H

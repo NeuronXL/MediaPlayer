@@ -1,34 +1,77 @@
 #include "qaudiooutputadapter.h"
 
 #include <QMediaDevices>
-#include <QThread>
+#include <QSpan>
 
-#include <vector>
+#include <cstdint>
+#include <cstring>
 
 extern "C" {
-#include <libavutil/channel_layout.h>
 #include <libavutil/samplefmt.h>
-#include <libswresample/swresample.h>
 }
 
 QAudioOutputAdapter::QAudioOutputAdapter()
-    : m_audioSink(nullptr), m_ioDevice(nullptr) {}
+    : m_audioSink(nullptr), m_ioDevice(nullptr), m_audioFrameSource(nullptr) {}
 
 QAudioOutputAdapter::~QAudioOutputAdapter() {
     stop();
 }
 
 bool QAudioOutputAdapter::start() {
-    if (m_audioSink == nullptr) {
+    if (m_audioFrameSource == nullptr) {
         return false;
     }
 
-    if (m_ioDevice == nullptr) {
-        m_ioDevice = m_audioSink->start();
-    } else {
-        m_audioSink->resume();
+    if (m_audioSink == nullptr) {
+        const AudioOutputSpec spec = outputSpec();
+        m_audioFormat = QAudioFormat{};
+        m_audioFormat.setSampleRate(spec.sampleRate);
+        m_audioFormat.setChannelCount(spec.channels);
+        m_audioFormat.setSampleFormat(QAudioFormat::Int16);
+
+        const auto outputDevice = QMediaDevices::defaultAudioOutput();
+        if (!outputDevice.isFormatSupported(m_audioFormat)) {
+            return false;
+        }
+        m_audioSink = new QAudioSink(outputDevice, m_audioFormat);
+        if (m_audioSink == nullptr) {
+            return false;
+        }
     }
-    return m_ioDevice != nullptr;
+
+    if (m_audioSink->state() == QtAudio::ActiveState || m_audioSink->state() == QtAudio::IdleState) {
+        return true;
+    }
+
+    if (m_audioSink->state() == QtAudio::SuspendedState) {
+        m_audioSink->resume();
+        return true;
+    }
+
+    m_audioSink->start([this](QSpan<qint16> interleavedAudioBuffer) {
+        const int requestedBytes = static_cast<int>(interleavedAudioBuffer.size_bytes());
+        if (requestedBytes <= 0) {
+            return;
+        }
+
+        auto* destination = reinterpret_cast<std::uint8_t*>(interleavedAudioBuffer.data());
+        int filledBytes = 0;
+        if (m_audioFrameSource != nullptr) {
+            filledBytes = m_audioFrameSource->readPcm(destination, requestedBytes);
+        }
+        if (filledBytes < 0) {
+            filledBytes = 0;
+        }
+        if (filledBytes > requestedBytes) {
+            filledBytes = requestedBytes;
+        }
+        if (filledBytes < requestedBytes) {
+            std::memset(destination + filledBytes, 0, static_cast<size_t>(requestedBytes - filledBytes));
+        }
+    });
+
+    m_ioDevice = nullptr;
+    return m_audioSink->error() == QtAudio::NoError;
 }
 
 void QAudioOutputAdapter::pause() {
@@ -52,169 +95,43 @@ void QAudioOutputAdapter::reset() {
     stop();
 }
 
-bool QAudioOutputAdapter::write(const std::shared_ptr<AudioFrame>& frame) {
-    if (!frame || frame->frame == nullptr || frame->nbSamples <= 0 || frame->channels <= 0) {
-        return false;
-    }
-
-    if (!ensureResampler(*frame)) {
-        return false;
-    }
-
-    if (!ensureSink(*frame)) {
-        return false;
-    }
-
-    if (!start()) {
-        return false;
-    }
-
-    const int outputBytesPerSample = av_get_bytes_per_sample(static_cast<AVSampleFormat>(m_outSampleFormat));
-    if (outputBytesPerSample <= 0) {
-        return false;
-    }
-
-    const int outputSamples = static_cast<int>(
-        av_rescale_rnd(swr_get_delay(m_swrContext, frame->sampleRate) + frame->nbSamples,
-                       m_outSampleRate,
-                       frame->sampleRate,
-                       AV_ROUND_UP));
-    if (outputSamples <= 0 || m_outChannels <= 0) {
-        return false;
-    }
-
-    std::vector<uint8_t> outputBuffer(static_cast<size_t>(outputSamples) * m_outChannels * outputBytesPerSample);
-    uint8_t* outputData[1] = {outputBuffer.data()};
-    const uint8_t* const* inputData = const_cast<const uint8_t* const*>(frame->frame->extended_data);
-    const int convertedSamples = swr_convert(
-        m_swrContext,
-        outputData,
-        outputSamples,
-        inputData,
-        frame->nbSamples);
-    if (convertedSamples <= 0) {
-        return false;
-    }
-
-    const qint64 totalBytes = static_cast<qint64>(convertedSamples) * m_outChannels * outputBytesPerSample;
-    const char* data = reinterpret_cast<const char*>(outputBuffer.data());
-    qint64 written = 0;
-    while (written < totalBytes) {
-        const qint64 once = m_ioDevice->write(data + written, totalBytes - written);
-        if (once < 0) {
-            return false;
-        }
-        if (once == 0) {
-            QThread::msleep(2);
-            continue;
-        }
-        written += once;
-    }
-
-    return true;
+void QAudioOutputAdapter::setAudioFrameSource(IAudioFrameSource* source) {
+    m_audioFrameSource = source;
 }
 
-int64_t QAudioOutputAdapter::playedTimeMs() const {
-    if (m_audioSink == nullptr) {
-        return 0;
-    }
-    return m_audioSink->processedUSecs() / 1000;
+AudioOutputSpec QAudioOutputAdapter::outputSpec() const {
+    AudioOutputSpec spec;
+    const auto outputDevice = QMediaDevices::defaultAudioOutput();
+    const QAudioFormat preferredFormat = outputDevice.preferredFormat();
+    spec.sampleRate = preferredFormat.sampleRate() > 0
+        ? preferredFormat.sampleRate()
+        : (m_outSampleRate > 0 ? m_outSampleRate : 48000);
+    spec.channels = preferredFormat.channelCount() > 0
+        ? preferredFormat.channelCount()
+        : (m_outChannels > 0 ? m_outChannels : 2);
+    spec.sampleFormat = AV_SAMPLE_FMT_S16;
+    return spec;
 }
 
 bool QAudioOutputAdapter::ensureSink(const AudioFrame& frame) {
-    Q_UNUSED(frame);
-    const QAudioFormat::SampleFormat sampleFormat = QAudioFormat::Int16;
-    if (sampleFormat == QAudioFormat::Unknown) {
-        return false;
+    if (frame.sampleRate > 0) {
+        m_outSampleRate = frame.sampleRate;
     }
-
-    const bool sameFormat = m_audioSink != nullptr &&
-                            m_audioFormat.sampleRate() == m_outSampleRate &&
-                            m_audioFormat.channelCount() == m_outChannels &&
-                            m_audioFormat.sampleFormat() == sampleFormat;
-    if (sameFormat) {
-        return true;
+    if (frame.channels > 0) {
+        m_outChannels = frame.channels;
     }
-
-    if (m_audioSink != nullptr) {
-        m_audioSink->stop();
-        delete m_audioSink;
-        m_audioSink = nullptr;
-    }
-    m_ioDevice = nullptr;
-    m_audioFormat = QAudioFormat{};
-
-    m_audioFormat.setSampleRate(m_outSampleRate);
-    m_audioFormat.setChannelCount(m_outChannels);
-    m_audioFormat.setSampleFormat(sampleFormat);
-
-    auto outputDevice = QMediaDevices::defaultAudioOutput();
-    if (!outputDevice.isFormatSupported(m_audioFormat)) {
-        return false;
-    }
-
-    m_audioSink = new QAudioSink(outputDevice, m_audioFormat);
-    return m_audioSink != nullptr;
+    return true;
 }
 
 bool QAudioOutputAdapter::ensureResampler(const AudioFrame& frame) {
-    const int inSampleRate = frame.sampleRate;
-    const int inChannels = frame.channels;
-    const int inSampleFormat = frame.format;
-    const int outSampleRate = frame.sampleRate;
-    const int outChannels = frame.channels;
-    const int outSampleFormat = AV_SAMPLE_FMT_S16;
-
-    if (inSampleRate <= 0 || inChannels <= 0) {
+    if (frame.sampleRate <= 0 || frame.channels <= 0) {
         return false;
     }
-
-    const bool sameConfig = m_swrContext != nullptr &&
-                            m_inSampleRate == inSampleRate &&
-                            m_inChannels == inChannels &&
-                            m_inSampleFormat == inSampleFormat &&
-                            m_outSampleRate == outSampleRate &&
-                            m_outChannels == outChannels &&
-                            m_outSampleFormat == outSampleFormat;
-    if (sameConfig) {
-        return true;
-    }
-
-    releaseAudioContext();
-
-    AVChannelLayout inLayout;
-    AVChannelLayout outLayout;
-    av_channel_layout_default(&inLayout, inChannels);
-    av_channel_layout_default(&outLayout, outChannels);
-
-    if (swr_alloc_set_opts2(&m_swrContext,
-                            &outLayout,
-                            static_cast<AVSampleFormat>(outSampleFormat),
-                            outSampleRate,
-                            &inLayout,
-                            static_cast<AVSampleFormat>(inSampleFormat),
-                            inSampleRate,
-                            0,
-                            nullptr) < 0) {
-        av_channel_layout_uninit(&inLayout);
-        av_channel_layout_uninit(&outLayout);
-        releaseAudioContext();
-        return false;
-    }
-
-    av_channel_layout_uninit(&inLayout);
-    av_channel_layout_uninit(&outLayout);
-
-    if (swr_init(m_swrContext) < 0) {
-        releaseAudioContext();
-        return false;
-    }
-
-    m_inSampleRate = inSampleRate;
-    m_inChannels = inChannels;
-    m_inSampleFormat = inSampleFormat;
-    m_outSampleRate = outSampleRate;
-    m_outChannels = outChannels;
-    m_outSampleFormat = outSampleFormat;
+    m_inSampleRate = frame.sampleRate;
+    m_inChannels = frame.channels;
+    m_inSampleFormat = frame.format;
+    m_outSampleRate = frame.sampleRate;
+    m_outChannels = frame.channels;
+    m_outSampleFormat = frame.format;
     return true;
 }

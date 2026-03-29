@@ -19,6 +19,7 @@ class MediaPipelineService {
     void closeMedia();
     bool openMedia(std::string& filePath, MediaSourceInfo* sourceInfo, std::string* errorMessage);
     void seek(int64_t positionMs);
+    void setAudioOutputFormat(int sampleRate, int channels, int sampleFormat);
 
     FramePtr peekLastVideoFrame();
     FramePtr peekNextVideoFrame();

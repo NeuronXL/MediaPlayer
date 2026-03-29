@@ -13,6 +13,7 @@ extern "C" {
 #include <libavcodec/codec_par.h>
 #include <libavcodec/codec_desc.h>
 #include <libavformat/avformat.h>
+#include <libavutil/samplefmt.h>
 #include <libavutil/avutil.h>
 }
 
@@ -23,10 +24,23 @@ FFmpegDemuxer::FFmpegDemuxer(PacketQueue* videoPacketQueue, PacketQueue* audioPa
       m_subtitlePacketQueue(subtitlePacketQueue), m_videoFrameQueue(videoFrameQueue),
       m_audioFrameQueue(audioFrameQueue), m_formatContext(nullptr),
       m_videoStreamIndex(-1), m_audioStreamIndex(-1), m_subtitleStreamIndex(-1),
+      m_audioOutputSampleRate(48000), m_audioOutputChannels(2), m_audioOutputSampleFormat(AV_SAMPLE_FMT_S16),
       m_videoDecoder(videoPacketQueue, videoFrameQueue),
       m_audioDecoder(audioPacketQueue, audioFrameQueue) {}
 
 FFmpegDemuxer::~FFmpegDemuxer() {}
+
+void FFmpegDemuxer::setAudioOutputFormat(int sampleRate, int channels, int sampleFormat) {
+    if (sampleRate > 0) {
+        m_audioOutputSampleRate = sampleRate;
+    }
+    if (channels > 0) {
+        m_audioOutputChannels = channels;
+    }
+    if (sampleFormat >= 0) {
+        m_audioOutputSampleFormat = sampleFormat;
+    }
+}
 
 bool FFmpegDemuxer::open(const std::string& filePath, MediaSourceInfo* sourceInfo, std::string* errorMessage) {
     namespace fs = std::filesystem;
@@ -185,6 +199,9 @@ bool FFmpegDemuxer::open(const std::string& filePath, MediaSourceInfo* sourceInf
                 audioConfig.timeBaseNum = audioStream->time_base.num;
                 audioConfig.timeBaseDen = audioStream->time_base.den > 0 ? audioStream->time_base.den : 1;
                 audioConfig.frameIntervalMs = 20;
+                audioConfig.outputSampleRate = m_audioOutputSampleRate;
+                audioConfig.outputChannels = m_audioOutputChannels;
+                audioConfig.outputSampleFormat = m_audioOutputSampleFormat;
 
                 try {
                     m_audioDecoder.configure(audioConfig);

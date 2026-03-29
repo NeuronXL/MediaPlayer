@@ -2,6 +2,7 @@
 #define QAUDIOOUTPUTADAPTER_H
 
 #include "iaudioadapter.h"
+#include "../player/iaudioframesource.h"
 
 #include <QAudioFormat>
 #include <QAudioSink>
@@ -16,8 +17,8 @@ public:
     void pause() override;
     void stop() override;
     void reset() override;
-    bool write(const std::shared_ptr<AudioFrame>& frame) override;
-    int64_t playedTimeMs() const override;
+    void setAudioFrameSource(IAudioFrameSource* source) override;
+    AudioOutputSpec outputSpec() const override;
 
 private:
     bool ensureSink(const AudioFrame& frame);
@@ -27,6 +28,7 @@ private:
     QAudioFormat m_audioFormat;
     QAudioSink* m_audioSink;
     QIODevice* m_ioDevice;
+    IAudioFrameSource* m_audioFrameSource;
 };
 
 #endif // QAUDIOOUTPUTADAPTER_H

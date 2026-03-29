@@ -23,6 +23,7 @@ class FFmpegDemuxer {
 
     bool open(const std::string& filePath, MediaSourceInfo* sourceInfo, std::string* errorMessage);
     void seek(int64_t positionMs);
+    void setAudioOutputFormat(int sampleRate, int channels, int sampleFormat);
 
     private:
     void runLoop();
@@ -48,6 +49,9 @@ class FFmpegDemuxer {
     int m_videoStreamIndex;
     int m_audioStreamIndex;
     int m_subtitleStreamIndex;
+    int m_audioOutputSampleRate;
+    int m_audioOutputChannels;
+    int m_audioOutputSampleFormat;
 };
 
 #endif // FFMPEGDEMUXER_H
