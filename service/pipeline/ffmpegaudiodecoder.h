@@ -35,6 +35,7 @@ class FFmpegAudioDecoder {
     int m_outputSampleRate;
     int m_outputChannels;
     int m_outputSampleFormat;
+    int m_packetSerial;
 };
 
 #endif // FFMPEGAUDIODECODER_H

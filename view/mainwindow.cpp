@@ -67,10 +67,13 @@ MainWindow::MainWindow(QWidget* parent)
     connect(ui->actionDebug, &QAction::triggered, this, &MainWindow::toggleDebugPanel);
     connect(m_viewModel, &MainWindowViewModel::openFileRequested, this, &MainWindow::openFileDialog);
     connect(m_playbackControlWidget, &PlaybackControlWidget::playRequested, m_viewModel, &MainWindowViewModel::play);
+    connect(m_playbackControlWidget, &PlaybackControlWidget::pauseRequested, m_viewModel, &MainWindowViewModel::pause);
+    connect(m_playbackControlWidget, &PlaybackControlWidget::seekRequested, m_viewModel, &MainWindowViewModel::seek);
     connect(m_viewModel, &MainWindowViewModel::frameReady, this, [this](const QImage& frame, qint64 playbackTimeMs) {
         m_videoWidget->setFrame(frame);
         m_playbackControlWidget->setCurrentPosition(playbackTimeMs);
     });
+    connect(m_viewModel, &MainWindowViewModel::playStateChanged, m_playbackControlWidget, &PlaybackControlWidget::setPlayState);
     connect(m_viewModel, &MainWindowViewModel::mediaInfoChanged, this, &MainWindow::handleMediaInfoChanged);
     connect(m_viewModel, &MainWindowViewModel::logEntryAdded, m_logWidget, &LogWidget::appendLog);
 }

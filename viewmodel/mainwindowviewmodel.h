@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "../service/player/mediainfo.h"
+#include "../service/player/playstate.h"
 
 class MediaPlayerEngine;
 class QImageVideoAdapter;
@@ -27,9 +28,12 @@ class MainWindowViewModel : public QObject
     void mediaInfoChanged(const MediaInfo& mediaInfo);
     void logEntryAdded(const QString& message);
     void openFileRequested();
+    void playStateChanged(PlayState state);
 
   public slots:
     void play();
+    void pause();
+    void seek(qint64 positionMs);
     void requestOpenFile();
     void setSelectedFilePath(const QString& filePath);
 

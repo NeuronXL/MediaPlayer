@@ -46,6 +46,11 @@ class PacketQueue {
         return size_;
     }
 
+    int currentSerial() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return serial_;
+    }
+
     Packet* pop() {
         std::unique_lock<std::mutex> lock(mutex_);
         notEmpty_.wait(lock, [&] { return aborted_ || size_ > 0; });
@@ -55,16 +60,24 @@ class PacketQueue {
         --size_;
         int preIndex = rindex_;
         rindex_ = (rindex_ + 1 + capacity_) % capacity_;
+        Packet* packet = queue_[preIndex];
+        queue_[preIndex] = nullptr;
         notFull_.notify_all();
-        return queue_[preIndex];
+        return packet;
     }
 
     bool push(Packet* packet) {
         std::unique_lock<std::mutex> lock(mutex_);
-        notFull_.wait(lock, [&] { return aborted_ || size_ < capacity_; });
+        const int expectedSerial = serial_;
+        notFull_.wait(lock, [&] { return aborted_ || size_ < capacity_ || serial_ != expectedSerial; });
         if (aborted_)
             return false;
+        if (serial_ != expectedSerial)
+            return false;
         ++size_;
+        if (packet != nullptr) {
+            packet->serial = serial_;
+        }
         queue_[windex_] = packet;
         windex_ = (windex_ + 1 + capacity_) % capacity_;
         notEmpty_.notify_one();
@@ -74,6 +87,21 @@ class PacketQueue {
     void abort() {
         std::unique_lock<std::mutex> lock(mutex_);
         aborted_ = true;
+        notEmpty_.notify_all();
+        notFull_.notify_all();
+    }
+
+    void flushForSeek() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (size_) {
+            delete queue_[rindex_];
+            queue_[rindex_] = nullptr;
+            rindex_ = (rindex_ + 1) % capacity_;
+            --size_;
+        }
+        rindex_ = 0;
+        windex_ = 0;
+        ++serial_;
         notEmpty_.notify_all();
         notFull_.notify_all();
     }

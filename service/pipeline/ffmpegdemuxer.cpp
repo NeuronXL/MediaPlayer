@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdexcept>
 #include <vector>
+#include <algorithm>
 
 #include "../logging/logservice.h"
 
@@ -25,6 +26,7 @@ FFmpegDemuxer::FFmpegDemuxer(PacketQueue* videoPacketQueue, PacketQueue* audioPa
       m_audioFrameQueue(audioFrameQueue), m_formatContext(nullptr),
       m_videoStreamIndex(-1), m_audioStreamIndex(-1), m_subtitleStreamIndex(-1),
       m_audioOutputSampleRate(48000), m_audioOutputChannels(2), m_audioOutputSampleFormat(AV_SAMPLE_FMT_S16),
+      m_seekVersion(0),
       m_videoDecoder(videoPacketQueue, videoFrameQueue),
       m_audioDecoder(audioPacketQueue, audioFrameQueue) {}
 
@@ -234,7 +236,54 @@ bool FFmpegDemuxer::open(const std::string& filePath, MediaSourceInfo* sourceInf
 }
 
 void FFmpegDemuxer::seek(int64_t positionMs) {
-    (void)positionMs;
+    if (m_formatContext == nullptr) {
+        return;
+    }
+
+    const int64_t clampedMs = std::max<int64_t>(0, positionMs);
+    m_seekVersion.fetch_add(1, std::memory_order_relaxed);
+
+    int seekResult = -1;
+    {
+        std::lock_guard<std::mutex> lock(m_formatMutex);
+        if (m_formatContext == nullptr) {
+            return;
+        }
+
+        const int64_t globalTarget = av_rescale_q(clampedMs, AVRational{1, 1000}, AV_TIME_BASE_Q);
+        seekResult = av_seek_frame(m_formatContext, -1, globalTarget, AVSEEK_FLAG_BACKWARD);
+        if (seekResult < 0 && m_videoStreamIndex >= 0 &&
+            m_videoStreamIndex < static_cast<int>(m_formatContext->nb_streams)) {
+            const AVStream* videoStream = m_formatContext->streams[m_videoStreamIndex];
+            if (videoStream != nullptr) {
+                const int64_t streamTarget = av_rescale_q(clampedMs, AVRational{1, 1000}, videoStream->time_base);
+                seekResult = av_seek_frame(m_formatContext, m_videoStreamIndex, streamTarget, AVSEEK_FLAG_BACKWARD);
+            }
+        }
+        if (seekResult >= 0) {
+            avformat_flush(m_formatContext);
+        }
+    }
+
+    if (seekResult < 0) {
+        return;
+    }
+
+    if (m_videoPacketQueue != nullptr) {
+        m_videoPacketQueue->flushForSeek();
+    }
+    if (m_audioPacketQueue != nullptr) {
+        m_audioPacketQueue->flushForSeek();
+    }
+    if (m_subtitlePacketQueue != nullptr) {
+        m_subtitlePacketQueue->flushForSeek();
+    }
+    if (m_videoFrameQueue != nullptr) {
+        m_videoFrameQueue->flushForSeek();
+    }
+    if (m_audioFrameQueue != nullptr) {
+        m_audioFrameQueue->flushForSeek();
+    }
 }
 
 void FFmpegDemuxer::runLoop() {
@@ -248,10 +297,24 @@ void FFmpegDemuxer::runLoop() {
             return;
         }
 
-        const int readResult = av_read_frame(m_formatContext, packet);
+        const std::uint64_t seekVersion = m_seekVersion.load(std::memory_order_relaxed);
+        int readResult = 0;
+        {
+            std::lock_guard<std::mutex> lock(m_formatMutex);
+            if (m_formatContext == nullptr) {
+                av_packet_free(&packet);
+                return;
+            }
+            readResult = av_read_frame(m_formatContext, packet);
+        }
         if (readResult < 0) {
             av_packet_free(&packet);
             return;
+        }
+
+        if (seekVersion != m_seekVersion.load(std::memory_order_relaxed)) {
+            av_packet_free(&packet);
+            continue;
         }
 
         PacketQueue* targetQueue = nullptr;
@@ -288,7 +351,13 @@ void FFmpegDemuxer::runLoop() {
         }
 
         if (!targetQueue->push(mediaPacket)) {
-            av_packet_free(&packet);
+            if (mediaPacket->packet != nullptr) {
+                av_packet_free(&mediaPacket->packet);
+            }
+            delete mediaPacket;
+            if (seekVersion != m_seekVersion.load(std::memory_order_relaxed)) {
+                continue;
+            }
             return;
         }
     }

@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <atomic>
+#include <mutex>
 
 struct AVFormatContext;
 class FrameQueue;
@@ -52,6 +54,8 @@ class FFmpegDemuxer {
     int m_audioOutputSampleRate;
     int m_audioOutputChannels;
     int m_audioOutputSampleFormat;
+    std::atomic<std::uint64_t> m_seekVersion;
+    std::mutex m_formatMutex;
 };
 
 #endif // FFMPEGDEMUXER_H

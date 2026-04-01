@@ -32,6 +32,7 @@ class FFmpegVideoDecoder {
     int m_timeBaseNum;
     int m_timeBaseDen;
     int64_t m_frameIntervalMs;
+    int m_packetSerial;
 };
 
 #endif // FFMPEGVIDEODECODER_H

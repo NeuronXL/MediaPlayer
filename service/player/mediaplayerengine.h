@@ -36,6 +36,7 @@ public:
 
     void play();
     void pause();
+    void seek(int64_t positionMs);
     void openMedia(std::string filePath);
 
     void videoFeed();

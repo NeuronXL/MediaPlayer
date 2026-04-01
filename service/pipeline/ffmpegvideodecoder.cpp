@@ -16,7 +16,7 @@ extern "C" {
 FFmpegVideoDecoder::FFmpegVideoDecoder(PacketQueue* videoPacketQueue, FrameQueue* videoFrameQueue)
     : m_videoPacketQueue(videoPacketQueue), m_videoFrameQueue(videoFrameQueue),
       m_codecContext(nullptr), m_frame(nullptr), m_timeBaseNum(1), m_timeBaseDen(1000),
-      m_frameIntervalMs(33) {}
+      m_frameIntervalMs(33), m_packetSerial(-1) {}
 
 FFmpegVideoDecoder::~FFmpegVideoDecoder() {
     shutDwon();
@@ -79,6 +79,12 @@ void FFmpegVideoDecoder::runLoop() {
             break;
         }
 
+        const int packetSerial = packetWrapper->serial;
+        if (packetSerial != m_packetSerial) {
+            avcodec_flush_buffers(m_codecContext);
+            m_packetSerial = packetSerial;
+        }
+
         AVPacket* packet = packetWrapper->packet;
         const int sendResult = avcodec_send_packet(m_codecContext, packet);
         if (packet != nullptr) {
@@ -104,6 +110,11 @@ void FFmpegVideoDecoder::runLoop() {
             }
 
             if (m_videoFrameQueue != nullptr) {
+                if (packetSerial != m_videoPacketQueue->currentSerial()) {
+                    avcodec_flush_buffers(m_codecContext);
+                    av_frame_unref(m_frame);
+                    break;
+                }
                 auto decodedFrame = std::make_shared<VideoFrame>();
                 decodedFrame->frame = av_frame_clone(m_frame);
                 if (decodedFrame->frame == nullptr) {
@@ -111,6 +122,7 @@ void FFmpegVideoDecoder::runLoop() {
                     continue;
                 }
 
+                decodedFrame->serial = packetSerial;
                 decodedFrame->width = m_frame->width;
                 decodedFrame->height = m_frame->height;
                 decodedFrame->format = m_frame->format;
@@ -127,6 +139,9 @@ void FFmpegVideoDecoder::runLoop() {
 
                 if (!m_videoFrameQueue->push(decodedFrame)) {
                     av_frame_unref(m_frame);
+                    if (packetSerial != m_videoPacketQueue->currentSerial()) {
+                        break;
+                    }
                     return;
                 }
             }

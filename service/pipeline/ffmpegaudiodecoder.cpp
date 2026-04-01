@@ -19,7 +19,8 @@ extern "C" {
 FFmpegAudioDecoder::FFmpegAudioDecoder(PacketQueue* audioPacketQueue, FrameQueue* audioFrameQueue)
     : m_audioPacketQueue(audioPacketQueue), m_audioFrameQueue(audioFrameQueue),
       m_codecContext(nullptr), m_frame(nullptr), m_timeBaseNum(1), m_timeBaseDen(1000),
-      m_frameIntervalMs(20), m_outputSampleRate(0), m_outputChannels(0), m_outputSampleFormat(AV_SAMPLE_FMT_S16) {}
+      m_frameIntervalMs(20), m_outputSampleRate(0), m_outputChannels(0),
+      m_outputSampleFormat(AV_SAMPLE_FMT_S16), m_packetSerial(-1) {}
 
 FFmpegAudioDecoder::~FFmpegAudioDecoder() {
     shutDwon();
@@ -86,6 +87,12 @@ void FFmpegAudioDecoder::runLoop() {
             break;
         }
 
+        const int packetSerial = packetWrapper->serial;
+        if (packetSerial != m_packetSerial) {
+            avcodec_flush_buffers(m_codecContext);
+            m_packetSerial = packetSerial;
+        }
+
         AVPacket* packet = packetWrapper->packet;
         const int sendResult = avcodec_send_packet(m_codecContext, packet);
         if (packet != nullptr) {
@@ -107,6 +114,12 @@ void FFmpegAudioDecoder::runLoop() {
                 return;
             }
             if (receiveResult < 0) {
+                break;
+            }
+
+            if (packetSerial != m_audioPacketQueue->currentSerial()) {
+                avcodec_flush_buffers(m_codecContext);
+                av_frame_unref(m_frame);
                 break;
             }
 
@@ -143,6 +156,7 @@ void FFmpegAudioDecoder::runLoop() {
                 ? av_rescale_q(m_frame->duration, sourceTimeBase, msTimeBase)
                 : m_frameIntervalMs;
             decodedFrame->pos = m_frame->pkt_dts;
+            decodedFrame->serial = packetSerial;
 
             const AVSampleFormat inSampleFmt = static_cast<AVSampleFormat>(m_frame->format);
             const bool canDirectCopy = inSampleFmt == targetSampleFormat &&
@@ -252,6 +266,9 @@ void FFmpegAudioDecoder::runLoop() {
 
             if (!m_audioFrameQueue->push(decodedFrame)) {
                 av_frame_unref(m_frame);
+                if (packetSerial != m_audioPacketQueue->currentSerial()) {
+                    break;
+                }
                 return;
             }
 

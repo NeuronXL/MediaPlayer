@@ -51,6 +51,11 @@ class FrameQueue {
         return size_;
     }
 
+    int currentSerial() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return serial_;
+    }
+
     FramePtr peekLast() {
         std::unique_lock<std::mutex> lock(mutex_);
         if (size_ <= 0) {
@@ -82,8 +87,11 @@ class FrameQueue {
 
     bool push(FramePtr frame) {
         std::unique_lock<std::mutex> lock(mutex_);
-        notFull_.wait(lock, [&] { return aborted_ || size_ < capacity_; });
+        const int expectedSerial = serial_;
+        notFull_.wait(lock, [&] { return aborted_ || size_ < capacity_ || serial_ != expectedSerial; });
         if (aborted_)
+            return false;
+        if (serial_ != expectedSerial)
             return false;
         ++size_;
         queue_[windex_] = frame;
@@ -95,6 +103,20 @@ class FrameQueue {
     void abort() {
         std::unique_lock<std::mutex> lock(mutex_);
         aborted_ = true;
+        notEmpty_.notify_all();
+        notFull_.notify_all();
+    }
+
+    void flushForSeek() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (size_) {
+            queue_[rindex_].reset();
+            rindex_ = (rindex_ + 1) % capacity_;
+            --size_;
+        }
+        rindex_ = 0;
+        windex_ = 0;
+        ++serial_;
         notEmpty_.notify_all();
         notFull_.notify_all();
     }

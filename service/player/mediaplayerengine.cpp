@@ -110,6 +110,32 @@ void MediaPlayerEngine::pause() {
     }
 }
 
+void MediaPlayerEngine::seek(int64_t positionMs) {
+    const int64_t targetMs = std::max<int64_t>(0, positionMs);
+    const bool wasPlaying = (m_playState == PlayState::Playing);
+
+    m_playState = PlayState::Seeking;
+    if (m_audioAdapter) {
+        m_audioAdapter->pause();
+    }
+
+    m_activeAudioFrame.reset();
+    m_activeAudioOffset = 0;
+    m_pipelineService->seek(targetMs);
+    m_audioClock.setCurrentTime(targetMs);
+    m_videoClock.setCurrentTime(targetMs);
+    m_curPts = targetMs;
+
+    if (wasPlaying) {
+        m_playState = PlayState::Playing;
+        if (m_audioAdapter) {
+            m_audioAdapter->start();
+        }
+        return;
+    }
+    m_playState = PlayState::Paused;
+}
+
 void MediaPlayerEngine::openMedia(std::string filePath) {
     m_filePath = filePath;
     MediaSourceInfo sourceInfo;

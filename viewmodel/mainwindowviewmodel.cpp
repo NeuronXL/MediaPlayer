@@ -92,6 +92,18 @@ MainWindowViewModel::~MainWindowViewModel() {
 void MainWindowViewModel::play()
 {
     m_mediaPlayerEngine->play();
+    emit playStateChanged(PlayState::Playing);
+}
+
+void MainWindowViewModel::pause()
+{
+    m_mediaPlayerEngine->pause();
+    emit playStateChanged(PlayState::Paused);
+}
+
+void MainWindowViewModel::seek(qint64 positionMs)
+{
+    m_mediaPlayerEngine->seek(positionMs);
 }
 
 void MainWindowViewModel::requestOpenFile()
