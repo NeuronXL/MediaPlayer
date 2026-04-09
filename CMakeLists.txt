@@ -34,26 +34,56 @@ qt_add_executable(MediaPlayer
         service/adapter/iaudioadapter.cpp
         service/adapter/ivideoadapter.h
         service/adapter/ivideoadapter.cpp
+        service/pipeline/interface/ivideorenderadapter.h
+        service/pipeline/interface/iaudiooutputadapter.h
+        service/pipeline/interface/isubtitlerenderadapter.h
         service/logging/logservice.cpp
         service/logging/logservice.h
-        service/pipeline/framequeue.h
-        service/pipeline/ffmpegdemuxer.cpp
-        service/pipeline/ffmpegdemuxer.h
-        service/pipeline/ffmpegaudiodecoder.cpp
-        service/pipeline/ffmpegaudiodecoder.h
-        service/pipeline/ffmpegvideodecoder.cpp
-        service/pipeline/ffmpegvideodecoder.h
+        service/pipeline/factory/ffmpegcomponentfactory.cpp
+        service/pipeline/factory/ffmpegcomponentfactory.h
+        service/pipeline/interface/ffmpegmediademuxer.cpp
+        service/pipeline/interface/ffmpegmediademuxer.h
+        service/pipeline/interface/ffmpegvideodecodercomponent.cpp
+        service/pipeline/interface/ffmpegvideodecodercomponent.h
+        service/pipeline/interface/iframetransformer.h
+        service/pipeline/interface/ffmpegvideoframetransformer.h
+        service/pipeline/interface/ffmpegvideoframetransformer.cpp
+        service/pipeline/interface/ffmpegaudioframetransformer.h
+        service/pipeline/interface/ffmpegaudioframetransformer.cpp
+        service/pipeline/interface/filemediasource.cpp
+        service/pipeline/interface/filemediasource.h
+        service/pipeline/interface/ipacketqueue.h
+        service/pipeline/interface/blockingpacketqueue.h
+        service/pipeline/interface/blockingpacketqueue.cpp
+        service/pipeline/interface/iframequeue.h
+        service/pipeline/interface/blockingframequeue.h
+        service/pipeline/interface/blockingframequeue.cpp
+        service/pipeline/factory/filemediasourcefactory.cpp
+        service/pipeline/factory/filemediasourcefactory.h
+        service/pipeline/factory/ibackendcomponentfactory.h
+        service/pipeline/interface/imediademuxer.h
+        service/pipeline/interface/imediasource.h
+        service/pipeline/interface/decoderinitdata.h
+        service/pipeline/interface/ivideodecoder.h
+        service/pipeline/interface/ipipelineevents.h
+        service/pipeline/interface/imediapipeline.h
+        service/pipeline/factory/imediasourcefactory.h
+        service/pipeline/factory/ibackendfactory.h
+        service/pipeline/factory/mediabackendfactory.cpp
+        service/pipeline/factory/mediabackendfactory.h
         service/pipeline/mediasourceinfo.h
         service/pipeline/mediapipelineservice.cpp
         service/pipeline/mediapipelineservice.h
-        service/pipeline/packetqueue.h
-        service/pipeline/workerconfig.h
         service/player/mediaplayerengine.cpp
         service/player/mediaplayerengine.h
         service/player/engineevent.h
         service/player/masterclocktype.h
+        service/player/imediaclock.h
         service/player/mediaclock.cpp
         service/player/mediaclock.h
+        service/player/iplaybackscheduler.h
+        service/player/simpleplaybackscheduler.h
+        service/player/simpleplaybackscheduler.cpp
         service/adapter/iaudioadapter.h
         service/player/playstate.h
         view/logwidget.cpp

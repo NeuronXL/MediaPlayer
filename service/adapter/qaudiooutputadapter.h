@@ -19,6 +19,7 @@ public:
     void reset() override;
     void setAudioFrameSource(IAudioFrameSource* source) override;
     AudioOutputSpec outputSpec() const override;
+    int64_t playedTimeMs() const override;
 
 private:
     bool ensureSink(const AudioFrame& frame);

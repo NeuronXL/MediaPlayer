@@ -2,16 +2,17 @@
 #define IVIDEOADAPTER_H
 
 #include "../common/frame.h"
+#include "../pipeline/interface/ivideorenderadapter.h"
 
 #include <memory>
 
 struct SwsContext;
 
-class IVideoAdapter {
+class IVideoAdapter : public IVideoRenderAdapter {
 public:
     IVideoAdapter();
     virtual ~IVideoAdapter();
-    virtual void onVideoFrame(const std::shared_ptr<VideoFrame>& frame) = 0;
+    void onVideoFrame(const std::shared_ptr<VideoFrame>& frame) override = 0;
 
 protected:
     void releaseVideoContext();

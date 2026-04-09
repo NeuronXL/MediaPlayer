@@ -1,16 +1,18 @@
 #ifndef MEDIACLOCK_H
 #define MEDIACLOCK_H
 
+#include "imediaclock.h"
+
 #include <atomic>
 #include <cstdint>
 
-class MediaClock {
+class MediaClock : public IMediaClock {
 public:
     MediaClock();
     ~MediaClock();
 
-    int64_t getCurrentTime();
-    void setCurrentTime(int64_t pts);
+    int64_t getCurrentTime() override;
+    void setCurrentTime(int64_t pts) override;
 
 private:
     int64_t nowMs();

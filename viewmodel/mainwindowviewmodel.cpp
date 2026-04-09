@@ -24,20 +24,13 @@ MainWindowViewModel::MainWindowViewModel(QObject* parent)
 
     QPointer<MainWindowViewModel> eventGuard(this);
     m_engineSubscriptionId = m_mediaPlayerEngine->subscribe(
-        ENGINE_EVENT_VIDEO_FRAME | ENGINE_EVENT_OPEN_MEDIA_SUCCEEDED | ENGINE_EVENT_OPEN_MEDIA_FAILED,
+        ENGINE_EVENT_OPEN_MEDIA_SUCCEEDED | ENGINE_EVENT_OPEN_MEDIA_FAILED,
         [eventGuard](const EngineEvent& event) {
             if (!eventGuard) {
                 return;
             }
             QMetaObject::invokeMethod(eventGuard, [eventGuard, event]() {
                 if (!eventGuard) {
-                    return;
-                }
-
-                if (const auto* videoEvent = std::get_if<VideoFrameEvent>(&event)) {
-                    if (eventGuard->m_videoAdapter && videoEvent->frame) {
-                        eventGuard->m_videoAdapter->onVideoFrame(videoEvent->frame);
-                    }
                     return;
                 }
 

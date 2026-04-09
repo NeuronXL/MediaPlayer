@@ -2,6 +2,7 @@
 #define IAUDIOADAPTER_H
 
 #include "../common/frame.h"
+#include "../pipeline/interface/iaudiooutputadapter.h"
 
 #include <cstdint>
 #include <memory>
@@ -15,17 +16,18 @@ struct AudioOutputSpec {
     int sampleFormat = -1;
 };
 
-class IAudioAdapter {
+class IAudioAdapter : public IAudioOutputAdapter {
 public:
     IAudioAdapter();
     virtual ~IAudioAdapter();
 
-    virtual bool start() = 0;
-    virtual void pause() = 0;
-    virtual void stop() = 0;
-    virtual void reset() = 0;
-    virtual void setAudioFrameSource(IAudioFrameSource* source) = 0;
-    virtual AudioOutputSpec outputSpec() const = 0;
+    bool start() override = 0;
+    void pause() override = 0;
+    void stop() override = 0;
+    void reset() override = 0;
+    void setAudioFrameSource(IAudioFrameSource* source) override = 0;
+    AudioOutputSpec outputSpec() const override = 0;
+    int64_t playedTimeMs() const override = 0;
 
 protected:
     void releaseAudioContext();

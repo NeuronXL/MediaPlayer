@@ -113,6 +113,13 @@ AudioOutputSpec QAudioOutputAdapter::outputSpec() const {
     return spec;
 }
 
+int64_t QAudioOutputAdapter::playedTimeMs() const {
+    if (m_audioSink == nullptr) {
+        return 0;
+    }
+    return m_audioSink->processedUSecs() / 1000;
+}
+
 bool QAudioOutputAdapter::ensureSink(const AudioFrame& frame) {
     if (frame.sampleRate > 0) {
         m_outSampleRate = frame.sampleRate;

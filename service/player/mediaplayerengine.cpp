@@ -2,6 +2,7 @@
 
 #include "../logging/logservice.h"
 #include "../pipeline/mediapipelineservice.h"
+#include "simpleplaybackscheduler.h"
 
 #include <algorithm>
 #include <chrono>
@@ -11,7 +12,9 @@
 
 MediaPlayerEngine::MediaPlayerEngine(std::shared_ptr<IVideoAdapter> videoAdapter,
                                      std::shared_ptr<IAudioAdapter> audioAdapter)
-    : m_pipelineService(new MediaPipelineService())
+    : m_pipelineService(std::make_unique<MediaPipelineService>())
+    , m_playbackScheduler(std::make_unique<SimplePlaybackScheduler>())
+    , m_videoAdapter(std::move(videoAdapter))
     , m_audioAdapter(std::move(audioAdapter))
     , m_activeAudioFrame()
     , m_activeAudioOffset(0)
@@ -24,7 +27,10 @@ MediaPlayerEngine::MediaPlayerEngine(std::shared_ptr<IVideoAdapter> videoAdapter
     , m_playState(PlayState::Paused)
     , m_filePath()
     , m_curPts(0) {
-    (void)videoAdapter;
+    m_pipelineService->setEvents(this);
+    if (m_playbackScheduler) {
+        m_playbackScheduler->setMasterClockType(m_masterClockType);
+    }
     if (m_audioAdapter) {
         m_audioAdapter->setAudioFrameSource(this);
         const AudioOutputSpec spec = m_audioAdapter->outputSpec();
@@ -88,12 +94,19 @@ void MediaPlayerEngine::publishEvent(const EngineEvent& event) {
 }
 
 MediaPlayerEngine::~MediaPlayerEngine() {
+    m_playState = PlayState::Paused;
     if (m_videoFeedThread.joinable()) {
         if (m_videoFeedThread.get_id() != std::this_thread::get_id()) {
             m_videoFeedThread.join();
         } else {
             m_videoFeedThread.detach();
         }
+    }
+    if (m_audioAdapter) {
+        m_audioAdapter->stop();
+    }
+    if (m_pipelineService) {
+        m_pipelineService->closeMedia();
     }
 }
 
@@ -146,10 +159,8 @@ void MediaPlayerEngine::openMedia(std::string filePath) {
     m_activeAudioFrame.reset();
     m_activeAudioOffset = 0;
 
-    if (opened) {
-        publishEvent(OpenMediaSucceededEvent{sourceInfo});
-    } else {
-        publishEvent(OpenMediaFailedEvent{m_filePath, errorMessage});
+    if (!opened) {
+        onOpenMediaFailed(m_filePath, errorMessage);
     }
 }
 
@@ -159,14 +170,16 @@ void MediaPlayerEngine::videoFeed() {
         if (m_playState == PlayState::Paused) {
             delay = 10;
         } else if (m_playState == PlayState::Playing) {
-            FramePtr nextFrame = m_pipelineService->peekNextVideoFrame();
+            auto nextFrame = m_pipelineService->peekNextVideoFrame();
             if (!nextFrame) {
                 goto nextVideoLoop;
             }
 
             m_videoClock.setCurrentTime(nextFrame->pts);
             if (auto videoFrame = std::dynamic_pointer_cast<VideoFrame>(nextFrame)) {
-                publishEvent(VideoFrameEvent{videoFrame});
+                if (m_videoAdapter) {
+                    m_videoAdapter->onVideoFrame(videoFrame);
+                }
             }
             delay = computeClockDelay(nextFrame->duration);
             auto droppedFrame = m_pipelineService->popVideoFrame();
@@ -178,20 +191,26 @@ nextVideoLoop:
 }
 
 int64_t MediaPlayerEngine::computeClockDelay(int64_t delay) {
-    int64_t diff;
-    int64_t syncThreshold = 0;
-    if (m_masterClockType == MasterClockType::Audio) {
-        diff = m_videoClock.getCurrentTime() - m_audioClock.getCurrentTime();
-        syncThreshold = std::max(1ll * 40, std::min(1ll * 100, delay));
-        if (diff <= -syncThreshold) {
-            delay = std::max(0ll, delay + diff);
-        } else if (diff >= syncThreshold && delay > 100ll) {
-            delay = delay + diff;
-        } else if (diff >= syncThreshold) {
-            delay = 2 * delay;
-        }
+    if (m_playbackScheduler) {
+        return m_playbackScheduler->computeVideoDelayMs(delay, m_videoClock, m_audioClock);
     }
     return delay;
+}
+
+void MediaPlayerEngine::onOpenMediaSucceeded(const MediaSourceInfo& mediaInfo) {
+    publishEvent(OpenMediaSucceededEvent{mediaInfo});
+}
+
+void MediaPlayerEngine::onOpenMediaFailed(const std::string& filePath, const std::string& errorMessage) {
+    publishEvent(OpenMediaFailedEvent{filePath, errorMessage});
+}
+
+void MediaPlayerEngine::onPipelineError(const std::string& errorMessage) {
+    LogService::instance().append("pipeline error: " + errorMessage);
+}
+
+void MediaPlayerEngine::onSeekCompleted(int64_t positionMs) {
+    (void)positionMs;
 }
 
 int MediaPlayerEngine::readPcm(std::uint8_t* destination, int maxBytes) {
@@ -209,7 +228,7 @@ int MediaPlayerEngine::readPcm(std::uint8_t* destination, int maxBytes) {
             m_activeAudioFrame.reset();
             m_activeAudioOffset = 0;
 
-            FramePtr nextFrame = m_pipelineService->peekNextAudioFrame();
+            auto nextFrame = m_pipelineService->peekNextAudioFrame();
             if (!nextFrame) {
                 break;
             }

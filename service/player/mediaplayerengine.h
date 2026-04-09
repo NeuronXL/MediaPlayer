@@ -3,25 +3,26 @@
 
 #include "../adapter/ivideoadapter.h"
 #include "../adapter/iaudioadapter.h"
+#include "../pipeline/interface/ipipelineevents.h"
+#include "../pipeline/interface/imediapipeline.h"
 #include "iaudioframesource.h"
 #include "engineevent.h"
+#include "iplaybackscheduler.h"
 #include "masterclocktype.h"
 #include "mediaclock.h"
 #include "playstate.h"
 
 #include <atomic>
 #include <cstdint>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <cstddef>
 #include <string>
 #include <thread>
 #include <vector>
 
-class MediaPipelineService;
-
-class MediaPlayerEngine : public IAudioFrameSource {
+class MediaPlayerEngine : public IAudioFrameSource, public IPipelineEvents {
 public:
     using SubscriptionId = std::uint64_t;
     using EventHandler = std::function<void(const EngineEvent&)>;
@@ -42,6 +43,11 @@ public:
     void videoFeed();
     int readPcm(std::uint8_t* destination, int maxBytes) override;
 
+    void onOpenMediaSucceeded(const MediaSourceInfo& mediaInfo) override;
+    void onOpenMediaFailed(const std::string& filePath, const std::string& errorMessage) override;
+    void onPipelineError(const std::string& errorMessage) override;
+    void onSeekCompleted(int64_t positionMs) override;
+
 private:
     int64_t computeClockDelay(int64_t delay);
     void publishEvent(const EngineEvent& event);
@@ -55,7 +61,9 @@ private:
     };
 
     std::thread m_videoFeedThread;
-    MediaPipelineService* m_pipelineService;
+    std::unique_ptr<IMediaPipeline> m_pipelineService;
+    std::unique_ptr<IPlaybackScheduler> m_playbackScheduler;
+    std::shared_ptr<IVideoAdapter> m_videoAdapter;
     std::shared_ptr<IAudioAdapter> m_audioAdapter;
     std::shared_ptr<AudioFrame> m_activeAudioFrame;
     std::size_t m_activeAudioOffset;
